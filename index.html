@@ -354,6 +354,32 @@
     .customer-ledger-customer-row>div strong{display:block;overflow-wrap:anywhere}
     .customer-ledger-customer-row>strong{font-size:.82rem;white-space:nowrap}
     @media(max-width:700px){.customer-ledger-controls,.customer-ledger-adjustment-grid{grid-template-columns:1fr}.customer-ledger-stats{grid-template-columns:repeat(2,minmax(0,1fr))}.customer-ledger-customer-row{grid-template-columns:1fr auto}.customer-ledger-customer-row button{grid-column:1/-1}.customer-ledger-lock{width:100%;text-align:center}}
+
+    /* عرض الجداول العريضة بالكامل مع تمرير أفقي باللمس أو الماوس */
+    .wide-table-scroll{
+      width:100%;max-width:100%;overflow-x:auto;overflow-y:hidden;
+      -webkit-overflow-scrolling:touch;overscroll-behavior-x:contain;
+      touch-action:pan-x pan-y;direction:rtl;border:1px solid #e2e8f0;
+      border-radius:13px;background:#fff;margin:12px 0;scrollbar-width:thin;
+    }
+    .wide-table-scroll:focus{outline:3px solid rgba(14,145,184,.18);outline-offset:2px}
+    .wide-table-scroll .data-table{display:table;width:100%;margin:0;border:0;border-radius:0;overflow:visible;white-space:normal}
+    .inventory-wide-table{min-width:1120px;table-layout:auto}
+    .cart-wide-table{min-width:920px;table-layout:auto}
+    .wide-table-scroll th,.wide-table-scroll td{white-space:normal;overflow-wrap:anywhere;vertical-align:middle}
+    .inventory-wide-table th:nth-child(2),.inventory-wide-table td:nth-child(2){min-width:230px}
+    .inventory-wide-table th:nth-child(5),.inventory-wide-table td:nth-child(5){min-width:300px}
+    .cart-wide-table th:nth-child(1),.cart-wide-table td:nth-child(1){min-width:190px}
+    .cart-wide-table th:nth-child(2),.cart-wide-table td:nth-child(2){min-width:150px}
+    .cart-wide-table th:nth-child(6),.cart-wide-table td:nth-child(6){min-width:100px}
+    .login-logo-setting-preview{display:flex;align-items:center;justify-content:center;min-height:86px;width:100%;margin:8px 0 12px;padding:8px;border:1px dashed #94a3b8;border-radius:12px;background:#f8fafc;color:#64748b}
+    .login-logo-setting-preview img{width:76px;height:76px;object-fit:contain;border-radius:12px;background:#fff}
+    @media(max-width:900px){
+      .wide-table-scroll{margin-inline:-2px;width:calc(100% + 4px);max-width:calc(100% + 4px)}
+      .inventory-wide-table{min-width:1080px}
+      .cart-wide-table{min-width:900px}
+    }
+
     /* لوحة حالة اتصال الكادر */
     .admin-presence-panel{border:1px solid #dce8f2!important;background:linear-gradient(145deg,#fff,#f8fbff)!important}
     .presence-heading{display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap}
@@ -564,12 +590,14 @@
             <button type="submit" class="btn-success full-width" style="grid-column: 1 / -1; margin-top: 10px;">💾 حفظ المنتج ورفعه للمناديب فوراً</button>
           </form>
           
-          <table class="data-table">
-            <thead>
-              <tr><th>الصورة</th><th>المنتج والوصف</th><th>السعر</th><th>المخزون الكلي</th><th>النكهات والحالة</th><th>إجراءات</th></tr>
-            </thead>
-            <tbody id="inventoryTableBody"></tbody>
-          </table>
+          <div class="wide-table-scroll inventory-wide-scroll" role="region" aria-label="جدول المنتجات والمخزون" tabindex="0">
+            <table class="data-table inventory-wide-table">
+              <thead>
+                <tr><th>الصورة</th><th>المنتج والوصف</th><th>السعر</th><th>المخزون الكلي</th><th>النكهات والحالة</th><th>إجراءات</th></tr>
+              </thead>
+              <tbody id="inventoryTableBody"></tbody>
+            </table>
+          </div>
         </div>
 
         <div class="card" style="border: 2px solid #0284c7; background: #f0f9ff;">
@@ -701,12 +729,16 @@
               <input type="text" id="settingSystemName" required>
               <label>اسم الشركة:</label>
               <input type="text" id="settingCompanyName" required>
-              <label>صورة لوغو الشركة:</label>
+              <label>شعار النظام داخل لوحة العمل والفواتير:</label>
               <input type="file" id="settingLogoFile" accept="image/*">
+              <label>🖼️ شعار شاشة تسجيل الدخول فقط:</label>
+              <input type="file" id="settingLoginLogoFile" accept="image/*">
+              <div id="settingLoginLogoPreview" class="login-logo-setting-preview">معاينة شعار تسجيل الدخول</div>
+              <small style="display:block;color:#64748b;margin:4px 0 12px;">هذا الشعار يظهر في شاشة تسجيل البريد والرمز فقط، ولا يغيّر شعار القائمة الداخلية.</small>
               <label>اسم المدير:</label>
               <input type="text" id="settingManagerName" required>
               <label>رقم هاتف المدير (للإشعارات 📱):</label>
-              <input type="text" id="settingPhone" placeholder="مثال: 07700000000" required>
+              <input type="tel" id="settingPhone" inputmode="tel" autocomplete="off" dir="ltr" placeholder="مثال: 07700000000" required>
               <label>📞 هاتف الشكاوي:</label>
               <input type="text" id="settingComplaintsPhone" required>
               <label>✍️ اسم "إشراف وتنفيذ وتصميم البرنامج":</label>
@@ -800,14 +832,16 @@
 
           <div style="margin-top: 20px;">
             <h4>📋 محتويات السلة المختارة للفاتورة:</h4>
-            <table class="data-table">
-              <thead>
-                <tr><th>المنتج</th><th>النكهة</th><th>الكمية</th><th>سعر الكارتون</th><th>الإجمالي</th><th>إجراء</th></tr>
-              </thead>
-              <tbody id="cartItemsTableBody">
-                <tr><td colspan="6" style="text-align: center; color: #64748b;">السلة فارغة. اختر منتجاً من الأعلى لإضافته.</td></tr>
-              </tbody>
-            </table>
+            <div class="wide-table-scroll cart-wide-scroll" role="region" aria-label="محتويات السلة المختارة للفاتورة" tabindex="0">
+              <table class="data-table cart-wide-table">
+                <thead>
+                  <tr><th>المنتج</th><th>النكهة</th><th>الكمية</th><th>سعر الكارتون</th><th>الإجمالي</th><th>إجراء</th></tr>
+                </thead>
+                <tbody id="cartItemsTableBody">
+                  <tr><td colspan="6" style="text-align: center; color: #64748b;">السلة فارغة. اختر منتجاً من الأعلى لإضافته.</td></tr>
+                </tbody>
+              </table>
+            </div>
           </div>
 
           <form onsubmit="createInvoice(event)" style="margin-top: 20px; border-top: 2px solid #e2e8f0; padding-top: 15px;">
@@ -1305,6 +1339,7 @@ try {
         name: "نظام إدارة المبيعات والتوصيل",
         companyName: "باب الآغا",
         logoUrl: "",
+        loginLogoUrl: "",
         managerName: "المدير العام",
         phone: "07700000000",
         complaintsPhone: "07799999999",
@@ -2281,6 +2316,7 @@ try {
             updateCloudSyncBadge('🟡 فشل الحفظ في Firestore - تحقق من قواعد الأمان والاتصال', '#facc15');
           });
       }
+      return firestoreSaveQueue;
     }
 
     function applySystemBranding() {
@@ -2288,6 +2324,17 @@ try {
       document.getElementById('pageMainTitle').innerText = name;
       document.getElementById('loginSystemTitle').innerText = name;
       document.getElementById('sidebarSignature').innerText = `إشراف وتنفيذ وتصميم البرنامج: ${state.company.programCredit || "المدير العام"}`;
+
+      // شعار شاشة تسجيل الدخول مستقل عن شعار القائمة والفواتير.
+      const authLogoBox = document.getElementById('companyLogoPreviewAuth');
+      if (authLogoBox) {
+        const loginLogo = state.company.loginLogoUrl || state.company.logoUrl || '';
+        if (loginLogo) {
+          authLogoBox.innerHTML = `<img src="${loginLogo}" alt="شعار شاشة تسجيل الدخول" style="width:100%;height:100%;object-fit:contain;">`;
+        } else {
+          authLogoBox.innerHTML = '<span id="logoTextAuth">اللوغو</span>';
+        }
+      }
     }
 
     function switchRoleTab(role, btnElement) {
@@ -3253,6 +3300,13 @@ try {
       document.getElementById('settingProgramCredit').value = state.company.programCredit || "";
       document.getElementById('settingInvoiceSlogan').value = state.company.invoiceSlogan || "";
       document.getElementById('settingBroadcastText').value = state.company.broadcastText || "";
+      const loginLogoPreview = document.getElementById('settingLoginLogoPreview');
+      if (loginLogoPreview) {
+        const loginLogo = state.company.loginLogoUrl || '';
+        loginLogoPreview.innerHTML = loginLogo
+          ? `<img src="${loginLogo}" alt="معاينة شعار تسجيل الدخول">`
+          : 'لم يتم تعيين شعار منفصل لشاشة تسجيل الدخول بعد';
+      }
 
       const routeSelectDelegate = document.getElementById('routeSelectDelegate');
       routeSelectDelegate.innerHTML = '<option value="">اختر المندوب...</option>' + state.users.filter(u => u.role === 'delegate').map(d => `<option value="${d.id}">${d.name}</option>`).join('');
@@ -3634,44 +3688,120 @@ try {
       renderAdminView();
     }
 
-    function saveCompanySettings(e) {
-      e.preventDefault();
-      state.company.name = document.getElementById('settingSystemName').value;
-      state.company.companyName = document.getElementById('settingCompanyName').value;
-      state.company.managerName = document.getElementById('settingManagerName').value;
-      state.company.phone = document.getElementById('settingPhone').value;
-      state.company.complaintsPhone = document.getElementById('settingComplaintsPhone').value;
-      state.company.programCredit = document.getElementById('settingProgramCredit').value;
-      state.company.invoiceSlogan = document.getElementById('settingInvoiceSlogan').value;
-      state.company.broadcastText = document.getElementById('settingBroadcastText').value;
-
-      const fileInput = document.getElementById('settingLogoFile');
-      if (fileInput.files && fileInput.files[0]) {
+    function readAndCompressLogoFile(file, maxDim = 420, quality = 0.78) {
+      return new Promise((resolve, reject) => {
+        if (!file) return resolve(null);
+        if (!file.type || !file.type.startsWith('image/')) return reject(new Error('الملف المختار ليس صورة صالحة.'));
         const reader = new FileReader();
-        reader.onload = function(e) {
+        reader.onerror = () => reject(new Error('تعذرت قراءة ملف الصورة.'));
+        reader.onload = event => {
           const img = new Image();
-          img.onload = function() {
-            const canvas = document.createElement('canvas');
-            const maxDim = 350;
+          img.onerror = () => reject(new Error('تعذر فتح الصورة المختارة.'));
+          img.onload = () => {
             const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+            const canvas = document.createElement('canvas');
             canvas.width = Math.max(1, Math.round(img.width * scale));
             canvas.height = Math.max(1, Math.round(img.height * scale));
-            canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
-            state.company.logoUrl = canvas.toDataURL('image/jpeg', 0.65);
-            saveData();
-            alert("تم الحفظ.");
-            setupDashboardView();
+            const context = canvas.getContext('2d');
+            if (!context) return reject(new Error('تعذر تجهيز الصورة للحفظ.'));
+            context.drawImage(img, 0, 0, canvas.width, canvas.height);
+            resolve(canvas.toDataURL('image/jpeg', quality));
           };
-          img.onerror = function() { alert('تعذر قراءة صورة الشعار.'); };
-          img.src = e.target.result;
+          img.src = event.target.result;
         };
-        reader.readAsDataURL(fileInput.files[0]);
-      } else {
-        saveData();
-        alert("تم الحفظ.");
-        setupDashboardView();
+        reader.readAsDataURL(file);
+      });
+    }
+
+    async function saveCompanySettings(e) {
+      e.preventDefault();
+      const saveButton = e.submitter || e.target.querySelector('button[type="submit"]');
+      const originalButtonText = saveButton ? saveButton.textContent : '';
+      if (saveButton) { saveButton.disabled = true; saveButton.textContent = 'جارٍ الحفظ...'; }
+
+      try {
+        const managerPhone = document.getElementById('settingPhone').value.trim();
+        if (!managerPhone) throw new Error('أدخل رقم هاتف المدير قبل الحفظ.');
+
+        state.company.name = document.getElementById('settingSystemName').value.trim();
+        state.company.companyName = document.getElementById('settingCompanyName').value.trim();
+        state.company.managerName = document.getElementById('settingManagerName').value.trim();
+        state.company.phone = managerPhone;
+        state.company.complaintsPhone = document.getElementById('settingComplaintsPhone').value.trim();
+        state.company.programCredit = document.getElementById('settingProgramCredit').value.trim();
+        state.company.invoiceSlogan = document.getElementById('settingInvoiceSlogan').value.trim();
+        state.company.broadcastText = document.getElementById('settingBroadcastText').value.trim();
+
+        // تحديث رقم المدير في سجل المستخدم أيضاً حتى لا تعيد الواجهة الرقم القديم.
+        const adminUser = (state.users || []).find(u =>
+          u.role === 'admin' && (
+            (state.currentUser && String(u.id) === String(state.currentUser.id)) ||
+            String(u.email || '').toLowerCase() === String(auth && auth.currentUser && auth.currentUser.email || '').toLowerCase()
+          )
+        ) || (state.users || []).find(u => u.role === 'admin');
+        if (adminUser) {
+          adminUser.phone = managerPhone;
+          if (state.currentUser && state.currentUser.role === 'admin' &&
+              String(state.currentUser.id) === String(adminUser.id)) {
+            state.currentUser.phone = managerPhone;
+          }
+        }
+
+        const systemLogoFile = document.getElementById('settingLogoFile').files[0] || null;
+        const loginLogoFile = document.getElementById('settingLoginLogoFile').files[0] || null;
+
+        if (systemLogoFile) {
+          state.company.logoUrl = await readAndCompressLogoFile(systemLogoFile, 420, 0.78);
+        }
+        if (loginLogoFile) {
+          state.company.loginLogoUrl = await readAndCompressLogoFile(loginLogoFile, 420, 0.78);
+        }
+
+        // حفظ محلي ثم انتظار كتابة مستقلة مؤكدة إلى Firestore بدلاً من إظهار نجاح مبكر.
+        saveLocalBackup();
+        if (db && auth && auth.currentUser && firestoreReady) {
+          firestoreSaveQueue = firestoreSaveQueue.then(() => persistStateToFirestore());
+          try {
+            await firestoreSaveQueue;
+          } catch (cloudError) {
+            updateCloudSyncBadge('🟡 تعذر حفظ الإعدادات في Firebase', '#facc15');
+            throw cloudError;
+          }
+        } else {
+          throw new Error('لا يوجد اتصال جاهز بـ Firebase؛ تم الاحتفاظ بالتغييرات محلياً فقط. أعد المحاولة بعد عودة الاتصال.');
+        }
+
+        applySystemBranding();
+        if (typeof setupDashboardView === 'function' && state.currentUser) {
+          document.getElementById('currentUserPhone').innerText = state.currentUser.phone || managerPhone;
+          setupDashboardView();
+        }
+        document.getElementById('settingLogoFile').value = '';
+        document.getElementById('settingLoginLogoFile').value = '';
+        alert('تم حفظ إعدادات الشركة ورقم هاتف المدير والشعارات في Firebase بنجاح.');
+      } catch (error) {
+        console.error('Company settings save failed:', error);
+        alert('تعذر تأكيد الحفظ في Firebase: ' + (error.message || error));
+      } finally {
+        if (saveButton) { saveButton.disabled = false; saveButton.textContent = originalButtonText || 'حفظ وتحديث النظام'; }
       }
     }
+
+    document.addEventListener('change', async function(event) {
+      if (event.target && event.target.id === 'settingLoginLogoFile') {
+        const preview = document.getElementById('settingLoginLogoPreview');
+        const file = event.target.files && event.target.files[0];
+        if (!preview || !file) return;
+        try {
+          const dataUrl = await readAndCompressLogoFile(file, 420, 0.78);
+          preview.innerHTML = dataUrl
+            ? `<img src="${dataUrl}" alt="معاينة شعار تسجيل الدخول">`
+            : 'لم يتم اختيار شعار';
+        } catch (error) {
+          preview.textContent = error.message || 'تعذر عرض الصورة.';
+        }
+      }
+    });
 
     function updateDelegatePhone(e) {
       e.preventDefault();
@@ -4037,8 +4167,8 @@ try {
         return;
       }
       currentCartItems.forEach((item, idx) => {
-        grandTotal += item.totalPrice;
-        tbody.innerHTML += `<tr><td><strong>${item.productName}</strong></td><td>${item.flavor}</td><td>${item.quantity} كارتون</td><td>${item.unitPrice.toLocaleString()} د.ع</td><td>${item.totalPrice.toLocaleString()} د.ع</td><td><button type="button" class="btn-danger" onclick="removeCartItem(${idx})">حذف</button></td></tr>`;
+        grandTotal += Number(item.totalPrice || 0);
+        tbody.innerHTML += `<tr><td><strong>${item.productName || '—'}</strong></td><td>${item.flavor || '—'}</td><td>${Number(item.quantity || 0).toLocaleString()} كارتون</td><td>${Number(item.unitPrice || 0).toLocaleString()} د.ع</td><td><strong>${Number(item.totalPrice || 0).toLocaleString()} د.ع</strong></td><td><button type="button" class="btn-danger" onclick="removeCartItem(${idx})">حذف</button></td></tr>`;
       });
       document.getElementById('cartGrandTotalPreview').innerText = grandTotal.toLocaleString();
     }
