@@ -457,6 +457,8 @@
     .customer-quick-transactions-card{background:white;border-radius:18px;padding:18px;box-shadow:0 2px 12px #0000000d}
     .customer-quick-stat-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:15px 0}
     .customer-quick-stat-grid>div{background:#f2f5fb;border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:6px}
+    .customer-quick-last-appearance{grid-column:1/-1;border:1px solid #d7e2f5;background:#edf3ff!important}
+    .customer-quick-last-appearance b{font-size:1rem;color:#294b78}
     .customer-quick-stat-grid small,.customer-quick-transaction-list small{color:#687080}
     .customer-quick-transaction-list>div{display:flex;justify-content:space-between;gap:12px;padding:12px 0;border-bottom:1px solid #e5e7eb}
     .customer-quick-transaction-list>div span{display:flex;flex-direction:column;gap:5px}
@@ -497,7 +499,39 @@
     .presence-status.is-offline{color:#9aa4b2;background:#f1f3f6}
     .presence-empty{padding:22px;text-align:center;color:#718096;background:#fff;border:1px dashed #d8e2ec;border-radius:12px}
     @media(max-width:600px){.presence-summary{gap:6px}.presence-count{padding:10px 8px;gap:6px;flex-direction:column;align-items:flex-start}.presence-count strong{font-size:1.2rem}.presence-count span{font-size:.7rem}.presence-user-row{gap:8px;padding:10px}.presence-avatar{width:36px;height:36px;flex-basis:36px}.presence-status{font-size:.68rem;padding:6px 8px}.presence-heading>button{width:100%}}
-  </style>
+  
+    /* جداول سجل حساب المندوب والسائق: تمرير أفقي فعلي لكل الأعمدة */
+    #staffProfileContent .staff-profile-table-scroll{
+      display:block!important;width:100%!important;max-width:100%!important;min-width:0!important;
+      overflow-x:auto!important;overflow-y:hidden!important;
+      -webkit-overflow-scrolling:touch!important;overscroll-behavior-x:contain;
+      touch-action:pan-x pan-y!important;direction:ltr!important;
+      scrollbar-width:thin;position:relative;border:1px solid #dbe3ef;
+      border-radius:10px;margin:9px 0 15px;background:#fff;
+    }
+    #staffProfileContent .staff-profile-table-scroll > table.data-table{
+      display:table!important;width:max-content!important;min-width:980px!important;
+      max-width:none!important;table-layout:auto!important;direction:rtl!important;
+      overflow:visible!important;margin:0!important;border-collapse:separate;
+    }
+    #staffProfileContent .staff-profile-table-scroll th,
+    #staffProfileContent .staff-profile-table-scroll td{
+      white-space:nowrap!important;min-width:110px!important;max-width:none!important;
+      overflow-wrap:normal!important;vertical-align:middle;padding:9px 12px!important;
+    }
+    #staffProfileContent .staff-profile-table-scroll td:last-child{min-width:230px!important}
+    #staffProfileContent .staff-profile-swipe-hint{
+      display:block!important;position:sticky;left:0;direction:rtl;text-align:center;
+      padding:7px 10px;color:#52657d;background:#f1f5fb;border-bottom:1px solid #dbe3ef;
+      font-size:12px;font-weight:700;white-space:normal;
+    }
+    @media(max-width:768px){
+      #staffProfileContent .staff-profile-table-scroll{width:100%!important;max-width:100%!important}
+      #staffProfileContent .staff-profile-table-scroll > table.data-table{min-width:1050px!important}
+      #staffProfileContent .staff-profile-table-scroll th,
+      #staffProfileContent .staff-profile-table-scroll td{min-width:125px!important}
+    }
+</style>
 </head>
 <body>
   <div class="screen-zoom-tools" id="screenZoomTools" aria-label="تكبير وتصغير الشاشة">
@@ -3728,10 +3762,10 @@ try {
       const dailySales = dailyOrders.reduce((sum,o)=>sum+Number(o.totalPrice||0),0);
       const clearedCommission = allOrders.filter(o => o.commissionCleared).reduce((sum,o)=>sum+Number(o.delegateCommission||0),0);
       const settlements = (state.staffSettlements || []).filter(x => String(x.staffId) === active.staffId && x.staffRole === active.role).slice().reverse();
-      const ordersHtml = dailyOrders.length ? `<div style="overflow-x:auto"><table class="data-table"><thead><tr><th>الفاتورة</th><th>التاريخ</th><th>الزبون</th><th>المبلغ</th><th>الحالة</th><th>المدفوع</th></tr></thead><tbody>${dailyOrders.slice().sort((a,b)=>Number(b.id)-Number(a.id)).map(o=>`<tr><td>#${o.id}</td><td>${staffOrderDate(o)||'—'}</td><td>${escapeStaffText(o.customerName||'—')}</td><td>${staffMoney(o.totalPrice)}</td><td>${escapeStaffText(o.status||'—')}</td><td>${staffMoney(staffPaidForOrder(o))}</td></tr>`).join('')}</tbody></table></div>` : '<p class="muted-note">لا توجد فواتير لهذا التاريخ.</p>';
-      const allInvoicesHtml = allOrders.length ? `<div style="overflow-x:auto"><table class="data-table"><thead><tr><th>رقم الفاتورة</th><th>التاريخ</th><th>الزبون</th><th>المبلغ</th><th>حالة الطلب</th><th>إجراءات الفاتورة</th></tr></thead><tbody>${allOrders.slice().sort((a,b)=>Number(b.id)-Number(a.id)).map(o=>`<tr><td><strong>#${o.id}</strong></td><td>${escapeStaffText(staffOrderDate(o)||'—')}</td><td>${escapeStaffText(o.customerName||'—')}</td><td>${staffMoney(o.totalPrice)}</td><td>${escapeStaffText(o.status||'—')}</td><td><div style="display:flex;gap:5px;flex-wrap:wrap"><button type="button" class="btn-secondary" onclick="openInvoicePrint(${Number(o.id)})">فتح</button><button type="button" class="btn-primary" onclick="openEditInvoiceModal(${Number(o.id)})">تحرير</button>${state.currentUser && state.currentUser.role === 'admin' ? `<button type="button" class="btn-danger" onclick="deleteInvoiceByAdmin(${Number(o.id)})">حذف</button>` : ''}<button type="button" class="btn-success" onclick="openInvoicePrint(${Number(o.id)});setTimeout(()=>window.print(),250)">طباعة</button><button type="button" class="btn-share" onclick="shareOrderWhatsAppAdvanced(${Number(o.id)})">مشاركة</button></div></td></tr>`).join('')}</tbody></table></div>` : '<p class="muted-note">لا توجد فواتير مسجلة لهذا الحساب.</p>';
-      const receiptsHtml = dailyReceipts.length ? `<div style="overflow-x:auto"><table class="data-table"><thead><tr><th>رقم السند</th><th>التاريخ</th><th>الزبون</th><th>المبلغ</th><th>ملاحظات</th><th>فتح</th></tr></thead><tbody>${dailyReceipts.slice().reverse().map(r=>`<tr><td>#${r.id}</td><td>${escapeStaffText(r.date||r.rawDate||'—')}</td><td>${escapeStaffText(r.customerName||'—')}</td><td>${staffMoney(r.amount)}</td><td>${escapeStaffText(r.notes||'—')}</td><td><button class="btn-secondary" onclick="openReceiptModal(${r.id})">عرض</button></td></tr>`).join('')}</tbody></table></div>` : '<p class="muted-note">لا توجد سندات قبض لهذا التاريخ.</p>';
-      const settlementsHtml = settlements.length ? `<div style="overflow-x:auto"><table class="data-table"><thead><tr><th>التاريخ</th><th>المبلغ المستلم</th><th>العمولة المسوّاة</th><th>عدد الفواتير</th><th>ملاحظات</th></tr></thead><tbody>${settlements.map(x=>`<tr><td>${escapeStaffText(x.dateLabel||x.rawDate||'—')}</td><td>${staffMoney(x.cashAmount)}</td><td>${staffMoney(x.commissionAmount)}</td><td>${Number(x.ordersCount||0)}</td><td>${escapeStaffText(x.notes||'استلام حساب')}</td></tr>`).join('')}</tbody></table></div>` : '<p class="muted-note">لا توجد عمليات استلام حساب سابقة.</p>';
+      const ordersHtml = dailyOrders.length ? `<div class="staff-profile-table-scroll" role="region" tabindex="0" aria-label="جدول قابل للسحب يميناً ويساراً"><div class="staff-profile-swipe-hint">↔ اسحب يميناً ويساراً لعرض جميع الأعمدة</div><table class="data-table"><thead><tr><th>الفاتورة</th><th>التاريخ</th><th>الزبون</th><th>المبلغ</th><th>الحالة</th><th>المدفوع</th></tr></thead><tbody>${dailyOrders.slice().sort((a,b)=>Number(b.id)-Number(a.id)).map(o=>`<tr><td>#${o.id}</td><td>${staffOrderDate(o)||'—'}</td><td>${escapeStaffText(o.customerName||'—')}</td><td>${staffMoney(o.totalPrice)}</td><td>${escapeStaffText(o.status||'—')}</td><td>${staffMoney(staffPaidForOrder(o))}</td></tr>`).join('')}</tbody></table></div>` : '<p class="muted-note">لا توجد فواتير لهذا التاريخ.</p>';
+      const allInvoicesHtml = allOrders.length ? `<div class="staff-profile-table-scroll" role="region" tabindex="0" aria-label="جدول قابل للسحب يميناً ويساراً"><div class="staff-profile-swipe-hint">↔ اسحب يميناً ويساراً لعرض جميع الأعمدة</div><table class="data-table"><thead><tr><th>رقم الفاتورة</th><th>التاريخ</th><th>الزبون</th><th>المبلغ</th><th>حالة الطلب</th><th>إجراءات الفاتورة</th></tr></thead><tbody>${allOrders.slice().sort((a,b)=>Number(b.id)-Number(a.id)).map(o=>`<tr><td><strong>#${o.id}</strong></td><td>${escapeStaffText(staffOrderDate(o)||'—')}</td><td>${escapeStaffText(o.customerName||'—')}</td><td>${staffMoney(o.totalPrice)}</td><td>${escapeStaffText(o.status||'—')}</td><td><div style="display:flex;gap:5px;flex-wrap:wrap"><button type="button" class="btn-secondary" onclick="openInvoicePrint(${Number(o.id)})">فتح</button><button type="button" class="btn-primary" onclick="openEditInvoiceModal(${Number(o.id)})">تحرير</button>${state.currentUser && state.currentUser.role === 'admin' ? `<button type="button" class="btn-danger" onclick="deleteInvoiceByAdmin(${Number(o.id)})">حذف</button>` : ''}<button type="button" class="btn-success" onclick="openInvoicePrint(${Number(o.id)});setTimeout(()=>window.print(),250)">طباعة</button><button type="button" class="btn-share" onclick="shareOrderWhatsAppAdvanced(${Number(o.id)})">مشاركة</button></div></td></tr>`).join('')}</tbody></table></div>` : '<p class="muted-note">لا توجد فواتير مسجلة لهذا الحساب.</p>';
+      const receiptsHtml = dailyReceipts.length ? `<div class="staff-profile-table-scroll" role="region" tabindex="0" aria-label="جدول قابل للسحب يميناً ويساراً"><div class="staff-profile-swipe-hint">↔ اسحب يميناً ويساراً لعرض جميع الأعمدة</div><table class="data-table"><thead><tr><th>رقم السند</th><th>التاريخ</th><th>الزبون</th><th>المبلغ</th><th>ملاحظات</th><th>فتح</th></tr></thead><tbody>${dailyReceipts.slice().reverse().map(r=>`<tr><td>#${r.id}</td><td>${escapeStaffText(r.date||r.rawDate||'—')}</td><td>${escapeStaffText(r.customerName||'—')}</td><td>${staffMoney(r.amount)}</td><td>${escapeStaffText(r.notes||'—')}</td><td><button class="btn-secondary" onclick="openReceiptModal(${r.id})">عرض</button></td></tr>`).join('')}</tbody></table></div>` : '<p class="muted-note">لا توجد سندات قبض لهذا التاريخ.</p>';
+      const settlementsHtml = settlements.length ? `<div class="staff-profile-table-scroll" role="region" tabindex="0" aria-label="جدول قابل للسحب يميناً ويساراً"><div class="staff-profile-swipe-hint">↔ اسحب يميناً ويساراً لعرض جميع الأعمدة</div><table class="data-table"><thead><tr><th>التاريخ</th><th>المبلغ المستلم</th><th>العمولة المسوّاة</th><th>عدد الفواتير</th><th>ملاحظات</th></tr></thead><tbody>${settlements.map(x=>`<tr><td>${escapeStaffText(x.dateLabel||x.rawDate||'—')}</td><td>${staffMoney(x.cashAmount)}</td><td>${staffMoney(x.commissionAmount)}</td><td>${Number(x.ordersCount||0)}</td><td>${escapeStaffText(x.notes||'استلام حساب')}</td></tr>`).join('')}</tbody></table></div>` : '<p class="muted-note">لا توجد عمليات استلام حساب سابقة.</p>';
       document.getElementById('staffProfileTitle').textContent = `السجل التفصيلي — ${staff.name}`;
       document.getElementById('staffProfileSubtitle').textContent = `${isDriver ? 'سائق توصيل' : 'مندوب مبيعات'} · ${staff.phone || 'لا يوجد رقم هاتف'} · عرض تراكمي محفوظ مع سجل التسويات`;
       content.innerHTML = `
@@ -4962,7 +4996,7 @@ html,body,#app,.app-shell,.main-content,.view-section,.card,
             <button type="button" onclick="alert('الرصيد الحالي: ${Math.abs(data.balance).toLocaleString('en-US')} د.ع — ${balanceLabel}')">▣　إظهار الرصيد</button>
           </div>
           <div class="customer-quick-actions">
-            <button type="button" onclick="showCustomerQuickTransactions('${String(customer.id).replace(/'/g, '')}')">▤　إظهار الكشف (الحركات)</button>
+            <button type="button" class="customer-quick-show-transactions" data-customer-ledger-id="${customerLedgerEscape(customer.id)}">▤　إظهار الكشف (الحركات)</button>
           </div>
           <div class="customer-quick-invoice">
             <button type="button" onclick="continueFromCustomerQuickProfile('${String(customer.id).replace(/'/g, '')}')">🛒　فاتورة جديدة لهذا الزبون</button>
@@ -4973,20 +5007,51 @@ html,body,#app,.app-shell,.main-content,.view-section,.card,
     }
 
     function showCustomerQuickTransactions(customerId) {
-      const customer = getCustomerById(customerId);
       const box = document.getElementById('customerQuickTransactions');
-      if (!customer || !box) return;
-      const data = customerLedgerData(customer);
-      box.innerHTML = `<div class="customer-quick-transactions-card">
-        <strong>كشف الحركات</strong>
-        <div class="customer-quick-stat-grid">
-          <div><small>إجمالي الفواتير</small><b>${data.salesTotal.toLocaleString('en-US')} د.ع</b></div>
-          <div><small>المتبقي</small><b>${data.invoiceDebt.toLocaleString('en-US')} د.ع</b></div>
-          <div><small>سندات القبض</small><b>${data.receiptTotal.toLocaleString('en-US')} د.ع</b></div>
-          <div><small>عدد الفواتير</small><b>${data.orders.length}</b></div>
-        </div>
-        ${data.transactions.length ? `<div class="customer-quick-transaction-list">${data.transactions.slice().reverse().map(item => `<div><span><b>${customerLedgerEscape(item.reference)}</b><small>${customerLedgerEscape(item.date || '')} — ${customerLedgerEscape(item.detail)}</small></span><strong>${Number(item.debit || item.credit || 0).toLocaleString('en-US')} د.ع</strong></div>`).join('')}</div>` : '<p>لا توجد حركات مسجلة لهذا الزبون.</p>'}
-      </div>`;
+      const customer = getCustomerById(customerId);
+      if (!box) {
+        console.error('Customer transactions container is missing.');
+        return alert('تعذر فتح كشف الحركات: نافذة حساب الزبون غير جاهزة. أغلق الحساب وافتحه مرة أخرى.');
+      }
+      if (!customer) {
+        box.innerHTML = '<div class="customer-quick-transactions-card"><p>تعذر العثور على الزبون المحدد. أعد اختيار الزبون وحاول مرة أخرى.</p></div>';
+        box.style.display = 'block';
+        return;
+      }
+      try {
+        const data = customerLedgerData(customer);
+        const money = value => Number(value || 0).toLocaleString('en-US') + ' د.ع';
+        const rows = Array.isArray(data.transactions) ? data.transactions.slice().reverse() : [];
+        // آخر ظهور للزبون = أحدث تاريخ مسجل في فاتورة أو سند قبض أو تسوية.
+        const datedRows = (data.transactions || []).map(item => {
+          const raw = String(item.date || '').trim();
+          const parsed = raw ? Date.parse(raw) : NaN;
+          return { raw, parsed };
+        }).filter(item => item.raw);
+        const latestActivity = datedRows
+          .filter(item => Number.isFinite(item.parsed))
+          .sort((a, b) => b.parsed - a.parsed)[0];
+        const lastAppearance = latestActivity
+          ? new Date(latestActivity.parsed).toLocaleDateString('ar-IQ')
+          : (datedRows.length ? datedRows[0].raw : 'لا توجد حركات سابقة');
+        box.innerHTML = `<div class="customer-quick-transactions-card">
+          <strong>كشف الحركات — ${customerLedgerEscape(customer.name || customer.storeName || 'الزبون')}</strong>
+          <div class="customer-quick-stat-grid">
+            <div><small>إجمالي الفواتير</small><b>${money(data.salesTotal)}</b></div>
+            <div><small>المتبقي</small><b>${money(data.invoiceDebt)}</b></div>
+            <div><small>سندات القبض</small><b>${money(data.receiptTotal)}</b></div>
+            <div><small>عدد الفواتير</small><b>${Number(data.orders?.length || 0)}</b></div>
+            <div class="customer-quick-last-appearance"><small>آخر ظهور / آخر حركة</small><b>${customerLedgerEscape(lastAppearance)}</b></div>
+          </div>
+          ${rows.length ? `<div class="customer-quick-transaction-list">${rows.map(item => `<div><span><b>${customerLedgerEscape(item.reference)}</b><small>${customerLedgerEscape(item.date || '')} — ${customerLedgerEscape(item.detail || '')}</small></span><strong>${money(Number(item.debit || 0) || Number(item.credit || 0))}</strong></div>`).join('')}</div>` : '<p class="customer-quick-empty">لا توجد حركات مسجلة لهذا الزبون حالياً.</p>'}
+        </div>`;
+        box.style.display = 'block';
+        box.scrollIntoView({behavior:'smooth', block:'nearest'});
+      } catch (error) {
+        console.error('Unable to render customer ledger:', error);
+        box.innerHTML = '<div class="customer-quick-transactions-card"><strong>تعذر تحميل كشف الحركات</strong><p>حدث خطأ أثناء قراءة حركات هذا الزبون. أعد فتح حسابه وحاول مرة أخرى.</p></div>';
+        box.style.display = 'block';
+      }
     }
 
     function continueFromCustomerQuickProfile(customerId) {
@@ -6113,6 +6178,16 @@ html,body,#app,.app-shell,.main-content,.view-section,.card,
     }
 
   
+    // ربط زر كشف الحركات بتفويض أحداث ثابت ليعمل داخل نافذة الحساب المنشأة ديناميكياً.
+    document.addEventListener('click', event => {
+      const button = event.target.closest('[data-customer-ledger-id]');
+      if (!button) return;
+      event.preventDefault();
+      event.stopPropagation();
+      showCustomerQuickTransactions(button.getAttribute('data-customer-ledger-id'));
+    });
+    window.showCustomerQuickTransactions = showCustomerQuickTransactions;
+
     // فتح بطاقة حساب الزبون مباشرةً عند اختياره من قوائم الفواتير/السندات.
     let suppressCustomerProfileOnChange = false;
     document.addEventListener('change', event => {
