@@ -208,13 +208,14 @@
       .stats-grid { grid-template-columns:1fr 1fr; }
     }
 
-    /* تحسين السحب الأفقي والقراءة على جميع الأجهزة */
+
+    /* تحسين العرض والسحب الأفقي على الهاتف */
     html, body { max-width:100%; overflow-x:hidden; }
     .app-container, .main-content, .view-section, .card, .order-card { min-width:0; }
     .main-content { overflow-x:hidden; }
     .data-table { display:block; width:100%; max-width:100%; overflow-x:auto; overflow-y:hidden; white-space:nowrap; -webkit-overflow-scrolling:touch; touch-action:pan-x pan-y; scrollbar-width:thin; }
     .data-table th, .data-table td { white-space:nowrap; }
-    .horizontal-scroll, .table-responsive { max-width:100%; overflow-x:auto; overflow-y:hidden; -webkit-overflow-scrolling:touch; touch-action:pan-x pan-y; }
+    .horizontal-scroll, .table-responsive, .wide-table-scroll { max-width:100%; overflow-x:auto; overflow-y:hidden; -webkit-overflow-scrolling:touch; touch-action:pan-x pan-y; }
     .order-card p, .card p, .staff-user-meta, .notif-item, .invoice-paper { overflow-wrap:anywhere; word-break:normal; }
     .invoice-actions-mobile { display:flex; flex-wrap:wrap; align-items:center; gap:7px; min-width:190px; }
     .invoice-actions-mobile button { min-height:40px; padding:8px 11px !important; white-space:nowrap; }
@@ -487,9 +488,9 @@
       <div id="sessionRestoreStatus" class="session-restore-status" role="status" aria-live="polite">يتم التحقق من الجلسة المحفوظة تلقائياً عند فتح النظام.</div>
       
       <div class="role-selector">
-        <button type="button" class="btn-role active" onclick="switchRoleTab('admin', this)">المدير</button>
-        <button type="button" class="btn-role" onclick="switchRoleTab('delegate', this)">مندوب مبيعات</button>
-        <button type="button" class="btn-role" onclick="switchRoleTab('driver', this)">سائق توصيل</button>
+        <button type="button" class="btn-role active" data-role="admin" aria-pressed="true" onclick="switchRoleTab('admin', this)">المدير</button>
+        <button type="button" class="btn-role" data-role="delegate" aria-pressed="false" onclick="switchRoleTab('delegate', this)">مندوب مبيعات</button>
+        <button type="button" class="btn-role" data-role="driver" aria-pressed="false" onclick="switchRoleTab('driver', this)">سائق توصيل</button>
       </div>
 
       <form id="loginForm" onsubmit="handleLogin(event)">
@@ -2423,9 +2424,21 @@ try {
     }
 
     function switchRoleTab(role, btnElement) {
+      const allowedRoles = ['admin', 'delegate', 'driver'];
+      if (!allowedRoles.includes(role)) return false;
       state.selectedRole = role;
-      document.querySelectorAll('.btn-role').forEach(btn => btn.classList.remove('active'));
-      if (btnElement) btnElement.classList.add('active');
+      const buttons = document.querySelectorAll('.role-selector .btn-role');
+      buttons.forEach(btn => {
+        const isActive = btn.dataset.role === role || btn === btnElement;
+        btn.classList.toggle('active', isActive);
+        btn.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+      });
+      const form = document.getElementById('loginForm');
+      if (form) form.dataset.selectedRole = role;
+      const labels = {admin:'المدير', delegate:'مندوب مبيعات', driver:'سائق توصيل'};
+      const status = document.getElementById('sessionRestoreStatus');
+      if (status) { status.textContent = `تم اختيار الدخول بصفة ${labels[role]}. أدخل بيانات الحساب للمتابعة.`; status.dataset.state = 'ready'; }
+      return true;
     }
 
     async function createFirebaseAuthUserSafely(email, password) {
@@ -2455,7 +2468,7 @@ try {
       const originalButtonText = submitButton ? submitButton.innerHTML : '';
       const identity = document.getElementById('usernameInput').value.trim().toLowerCase();
       const password = document.getElementById('passwordInput').value;
-      const expectedRole = state.selectedRole || 'admin';
+      const expectedRole = (document.getElementById('loginForm')?.dataset.selectedRole) || state.selectedRole || 'admin';
       const roleLabels = { admin: 'المدير', delegate: 'مندوب مبيعات', driver: 'سائق توصيل' };
       const status = document.getElementById('sessionRestoreStatus');
 
@@ -3716,4 +3729,1596 @@ try {
       pushNotification('delegate', 'تعديل العمولة التراكمية', `قام المدير بتعديل عمولتك التراكمية. الرصيد السابق: ${staffMoney(currentBalance)}، الرصيد الجديد: ${staffMoney(newBalance)}. مقدار التعديل: ${difference > 0 ? '+' : ''}${staffMoney(difference)}.`, delegate.id);
       saveData();
       renderAdminView();
-      alert('تم تحديث العمولة وإرسال إشعار خاص إ
+      alert('تم تحديث العمولة وإرسال إشعار خاص إلى المندوب.');
+    }
+
+    function clearDelegateCommission(delegateId) { openStaffAccountProfile('delegate', delegateId); }
+
+    function recordPartialDebtPayment(orderId) {
+      const order = state.orders.find(o => o.id === orderId);
+      if(!order) return;
+      const inputVal = parseFloat(document.getElementById(`partialPayInput_${orderId}`).value) || 0;
+      if (inputVal <= 0) return alert("الرجاء إدخال مبلغ صحيح.");
+      let totalPaidSoFar = (order.paidAmount || 0) + (order.partialPaidHistory ? order.partialPaidHistory.reduce((sum, item) => sum + item.amount, 0) : 0);
+      let rem = order.totalPrice - totalPaidSoFar;
+      if (inputVal > rem) return alert("المبلغ المدخل أكبر من المبلغ المتبقي!");
+      if (!order.partialPaidHistory) order.partialPaidHistory = [];
+      const nowStr = new Date().toLocaleString('ar-IQ');
+      order.partialPaidHistory.push({ amount: inputVal, date: nowStr });
+      saveData();
+      alert(`تم تسجيل استلام مبلغ ${inputVal.toLocaleString()} د.ع بنجاح.`);
+      renderAdminView();
+    }
+
+
+    // تصدير PDF موحد مع إعادة محاولة تحميل المكتبة، ومعالجة الأخطاء،
+    // وبديل الطباعة إلى PDF عند تعذر إنشاء الملف مباشرة.
+    let pdfExportInProgress = false;
+
+    function loadHtml2PdfLibrary() {
+      return new Promise((resolve, reject) => {
+        if (typeof window.html2pdf === 'function') return resolve(window.html2pdf);
+        const sources = [
+          'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js',
+          'https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js',
+          'https://unpkg.com/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js'
+        ];
+        let index = 0;
+        const tryNext = () => {
+          if (typeof window.html2pdf === 'function') return resolve(window.html2pdf);
+          if (index >= sources.length) return reject(new Error('تعذر تحميل مكتبة PDF. تحقق من اتصال الإنترنت أو استخدم خيار الطباعة.'));
+          const script = document.createElement('script');
+          script.src = sources[index++];
+          script.async = true;
+          script.onload = () => typeof window.html2pdf === 'function'
+            ? resolve(window.html2pdf)
+            : tryNext();
+          script.onerror = tryNext;
+          document.head.appendChild(script);
+        };
+        tryNext();
+      });
+    }
+
+    function printReportAsPDF(element, filename) {
+      return new Promise((resolve, reject) => {
+        const popup = window.open('', '_blank');
+        if (!popup) {
+          reject(new Error('المتصفح منع نافذة الطباعة. اسمح بالنوافذ المنبثقة ثم أعد المحاولة.'));
+          return;
+        }
+        const safeTitle = String(filename || 'Report').replace(/[<>"]/g, '');
+        const styles = Array.from(document.querySelectorAll('style, link[rel="stylesheet"]'))
+          .map(node => node.outerHTML).join('\n');
+        popup.document.open();
+        popup.document.write(`<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${safeTitle}</title>${styles}
+          <style>
+            @page{size:A4;margin:12mm}
+            html,body{background:#fff!important;color:#111!important;font-family:'Cairo',Arial,sans-serif!important}
+            body{padding:0!important}
+            table{width:100%;border-collapse:collapse;page-break-inside:auto}
+            tr{page-break-inside:avoid;page-break-after:auto}
+            th,td{border:1px solid #cbd5e1;padding:6px;text-align:right}
+            img{max-width:100%;height:auto}
+            button{display:none!important}
+            .hidden{display:none!important}
+            *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+          </style></head><body>${element.innerHTML}</body></html>`);
+        popup.document.close();
+        const doPrint = () => {
+          try {
+            popup.focus();
+            popup.print();
+            resolve(true);
+          } catch (error) {
+            reject(error);
+          }
+        };
+        popup.onload = () => setTimeout(doPrint, 500);
+        // بعض المتصفحات لا تطلق onload لنافذة document.write.
+        setTimeout(() => { if (!popup.closed) doPrint(); }, 1200);
+      });
+    }
+
+    async function exportElementToPDF(element, filename) {
+      if (!element) {
+        alert('تعذر العثور على محتوى التقرير المطلوب تصديره.');
+        return false;
+      }
+      if (pdfExportInProgress) {
+        alert('يوجد تصدير PDF قيد التنفيذ، انتظر قليلاً.');
+        return false;
+      }
+      pdfExportInProgress = true;
+      const oldDisplay = element.style.display;
+      const oldPosition = element.style.position;
+      const oldLeft = element.style.left;
+      const oldTop = element.style.top;
+      const oldWidth = element.style.width;
+
+      try {
+        element.style.display = 'block';
+        element.style.position = 'relative';
+        element.style.left = 'auto';
+        element.style.top = 'auto';
+        element.style.width = '100%';
+
+        // إتاحة وقت للمتصفح لإعادة حساب التخطيط قبل التقاط التقرير.
+        await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+
+        try {
+          const html2pdfFactory = await loadHtml2PdfLibrary();
+          await html2pdfFactory().set({
+            margin: [8, 8, 10, 8],
+            filename: filename,
+            image: { type: 'jpeg', quality: 0.95 },
+            html2canvas: {
+              scale: 1.5,
+              useCORS: true,
+              allowTaint: false,
+              backgroundColor: '#ffffff',
+              logging: false,
+              scrollX: 0,
+              scrollY: 0,
+              windowWidth: Math.max(document.documentElement.clientWidth, element.scrollWidth || 0)
+            },
+            pagebreak: { mode: ['css', 'legacy'] },
+            jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+          }).from(element).save();
+          return true;
+        } catch (pdfError) {
+          console.warn('Direct PDF export failed; switching to print fallback:', pdfError);
+          alert('تعذر إنشاء PDF مباشرة. سنفتح نافذة الطباعة؛ اختر «حفظ بتنسيق PDF» من الطابعة.');
+          await printReportAsPDF(element, filename);
+          return true;
+        }
+      } catch (error) {
+        console.error('PDF export failed:', error);
+        alert('تعذر تصدير التقرير: ' + (error.message || error));
+        return false;
+      } finally {
+        element.style.display = oldDisplay;
+        element.style.position = oldPosition;
+        element.style.left = oldLeft;
+        element.style.top = oldTop;
+        element.style.width = oldWidth;
+        pdfExportInProgress = false;
+      }
+    }
+
+    function exportDelegateReportPDF() {
+      const filterDateVal = document.getElementById('delegateReportFilterDate').value;
+      const myOrders = state.orders.filter(o => o.delegateId === state.currentUser.id);
+      let reportOrders = filterDateVal ? myOrders.filter(o => o.rawDate === filterDateVal) : [...myOrders];
+      let reportReceipts = state.receipts.filter(r => r.issuerId === state.currentUser.id);
+      if (filterDateVal) reportReceipts = reportReceipts.filter(r => r.rawDate === filterDateVal);
+
+      document.getElementById('delRepCompName').innerText = "شركة " + state.company.companyName;
+      document.getElementById('delRepUserTitle').innerText = `المندوب: ${state.currentUser.name} | التاريخ: ${filterDateVal || 'جميع الأوقات'}`;
+
+      let contentHtml = `<h4 style="color:#7c3aed; margin-bottom:8px;">📑 الفواتير الصادرة:</h4>`;
+      if(reportOrders.length === 0) contentHtml += `<p>لا توجد فواتير.</p>`;
+      else {
+        contentHtml += `<table style="width:100%; border-collapse:collapse; font-size:0.85rem; margin-bottom:15px;"><thead><tr style="background:#f1f5f9;"><th style="border:1px solid #cbd5e1; padding:6px;">رقم</th><th style="border:1px solid #cbd5e1; padding:6px;">الزبون</th><th style="border:1px solid #cbd5e1; padding:6px;">المبلغ</th><th style="border:1px solid #cbd5e1; padding:6px;">الدفع</th><th style="border:1px solid #cbd5e1; padding:6px;">الحالة</th></tr></thead><tbody>`;
+        reportOrders.forEach(o => { contentHtml += `<tr><td style="border:1px solid #cbd5e1; padding:6px;">#${o.id}</td><td style="border:1px solid #cbd5e1; padding:6px;">${o.customerName}</td><td style="border:1px solid #cbd5e1; padding:6px;">${o.totalPrice.toLocaleString()} د.ع</td><td style="border:1px solid #cbd5e1; padding:6px;">${o.paymentType}</td><td style="border:1px solid #cbd5e1; padding:6px;">${o.status}</td></tr>`; });
+        contentHtml += `</tbody></table>`;
+      }
+
+      contentHtml += `<h4 style="color:#0284c7; margin-bottom:8px;">🧾 سندات القبض:</h4>`;
+      if(reportReceipts.length === 0) contentHtml += `<p>لا توجد سندات.</p>`;
+      else {
+        contentHtml += `<table style="width:100%; border-collapse:collapse; font-size:0.85rem;"><thead><tr style="background:#f1f5f9;"><th style="border:1px solid #cbd5e1; padding:6px;">رقم السند</th><th style="border:1px solid #cbd5e1; padding:6px;">الزبون</th><th style="border:1px solid #cbd5e1; padding:6px;">المبلغ</th><th style="border:1px solid #cbd5e1; padding:6px;">التاريخ</th></tr></thead><tbody>`;
+        reportReceipts.forEach(r => { contentHtml += `<tr><td style="border:1px solid #cbd5e1; padding:6px;">#${r.id}</td><td style="border:1px solid #cbd5e1; padding:6px;">${r.customerName}</td><td style="border:1px solid #cbd5e1; padding:6px;">${r.amount.toLocaleString()} د.ع</td><td style="border:1px solid #cbd5e1; padding:6px;">${r.date}</td></tr>`; });
+        contentHtml += `</tbody></table>`;
+      }
+
+      document.getElementById('delRepContentBody').innerHTML = contentHtml;
+      const element = document.getElementById('delegateReportExportContainer');
+      exportElementToPDF(element, `Delegate_Report_${state.currentUser.name || 'Delegate'}.pdf`);
+    }
+
+    function exportDelegateReportExcel() {
+      const filterDateVal = document.getElementById('delegateReportFilterDate').value;
+      const myOrders = state.orders.filter(o => o.delegateId === state.currentUser.id);
+      let reportOrders = filterDateVal ? myOrders.filter(o => o.rawDate === filterDateVal) : [...myOrders];
+      let reportReceipts = state.receipts.filter(r => r.issuerId === state.currentUser.id);
+      if (filterDateVal) reportReceipts = reportReceipts.filter(r => r.rawDate === filterDateVal);
+
+      let excelData = [["شركة " + state.company.companyName, "تقرير نشاط المندوب", state.currentUser.name], ["التاريخ المحدد:", filterDateVal || "جميع الأوقات"], [""], ["سجل الفواتير الصادرة"], ["رقم الفاتورة", "اسم الزبون", "المبلغ الكلي", "نوع الدفع", "الحالة"]];
+      reportOrders.forEach(o => { excelData.push([o.id, o.customerName, o.totalPrice, o.paymentType, o.status]); });
+      excelData.push([""], ["سجل سندات القبض"], ["رقم السند", "اسم الزبون", "المبلغ المستلم", "التاريخ"]);
+      reportReceipts.forEach(r => { excelData.push([r.id, r.customerName, r.amount, r.date]); });
+
+      const ws = XLSX.utils.aoa_to_sheet(excelData);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "تقرير المندوب");
+      XLSX.writeFile(wb, `Delegate_Report_${state.currentUser.name}.xlsx`);
+    }
+
+    function exportDriverReportPDF() {
+      const filterDateVal = document.getElementById('driverFilterDate').value;
+      let myOrders = state.orders.filter(o => o.driverId === state.currentUser.id);
+      if (filterDateVal) myOrders = myOrders.filter(o => o.rawDate === filterDateVal);
+      let myReceipts = state.receipts.filter(r => r.issuerId === state.currentUser.id);
+      if (filterDateVal) myReceipts = myReceipts.filter(r => r.rawDate === filterDateVal);
+
+      let deliveredList = myOrders.filter(o => o.status === 'تم التسليم');
+      let rejectedList = myOrders.filter(o => o.status === 'تعذر التسليم');
+
+      document.getElementById('drvRepCompName').innerText = "شركة " + state.company.companyName;
+      document.getElementById('drvRepUserTitle').innerText = `السائق: ${state.currentUser.name} | التاريخ: ${filterDateVal || 'جميع الأوقات'}`;
+
+      let contentHtml = `<h4 style="color:#16a34a; margin-bottom:8px;">✅ الفواتير التي تم إيصالها بنجاح:</h4>`;
+      if(deliveredList.length === 0) contentHtml += `<p>لا توجد فواتير واصلة.</p>`;
+      else {
+        contentHtml += `<table style="width:100%; border-collapse:collapse; font-size:0.85rem; margin-bottom:15px;"><thead><tr style="background:#f1f5f9;"><th style="border:1px solid #cbd5e1; padding:6px;">رقم</th><th style="border:1px solid #cbd5e1; padding:6px;">الزبون</th><th style="border:1px solid #cbd5e1; padding:6px;">المندوب القاطع</th><th style="border:1px solid #cbd5e1; padding:6px;">المبلغ</th><th style="border:1px solid #cbd5e1; padding:6px;">الدفع</th></tr></thead><tbody>`;
+        deliveredList.forEach(o => { contentHtml += `<tr><td style="border:1px solid #cbd5e1; padding:6px;">#${o.id}</td><td style="border:1px solid #cbd5e1; padding:6px;">${o.customerName}</td><td style="border:1px solid #cbd5e1; padding:6px;">${o.delegateName}</td><td style="border:1px solid #cbd5e1; padding:6px;">${o.totalPrice.toLocaleString()} د.ع</td><td style="border:1px solid #cbd5e1; padding:6px;">${o.paymentType}</td></tr>`; });
+        contentHtml += `</tbody></table>`;
+      }
+
+      contentHtml += `<h4 style="color:#ef4444; margin-bottom:8px;">❌ الفواتير التي تم رفضها أو تعذر إيصالها:</h4>`;
+      if(rejectedList.length === 0) contentHtml += `<p>لا توجد فواتير مرفوضة.</p>`;
+      else {
+        contentHtml += `<table style="width:100%; border-collapse:collapse; font-size:0.85rem; margin-bottom:15px;"><thead><tr style="background:#f1f5f9;"><th style="border:1px solid #cbd5e1; padding:6px;">رقم</th><th style="border:1px solid #cbd5e1; padding:6px;">الزبون</th><th style="border:1px solid #cbd5e1; padding:6px;">المندوب القاطع</th><th style="border:1px solid #cbd5e1; padding:6px;">المبلغ</th><th style="border:1px solid #cbd5e1; padding:6px;">سبب الرفض</th></tr></thead><tbody>`;
+        rejectedList.forEach(o => { contentHtml += `<tr><td style="border:1px solid #cbd5e1; padding:6px;">#${o.id}</td><td style="border:1px solid #cbd5e1; padding:6px;">${o.customerName}</td><td style="border:1px solid #cbd5e1; padding:6px;">${o.delegateName}</td><td style="border:1px solid #cbd5e1; padding:6px;">${o.totalPrice.toLocaleString()} د.ع</td><td style="border:1px solid #cbd5e1; padding:6px; color:#dc2626;">${o.rejectReason || 'بدون ذكر سبب'}</td></tr>`; });
+        contentHtml += `</tbody></table>`;
+      }
+
+      document.getElementById('drvRepContentBody').innerHTML = contentHtml;
+      const element = document.getElementById('driverReportExportContainer');
+      exportElementToPDF(element, `Driver_Report_${state.currentUser.name || 'Driver'}.pdf`);
+    }
+
+    function exportDriverReportExcel() {
+      const filterDateVal = document.getElementById('driverFilterDate').value;
+      let myOrders = state.orders.filter(o => o.driverId === state.currentUser.id);
+      if (filterDateVal) myOrders = myOrders.filter(o => o.rawDate === filterDateVal);
+      let myReceipts = state.receipts.filter(r => r.issuerId === state.currentUser.id);
+      if (filterDateVal) myReceipts = myReceipts.filter(r => r.rawDate === filterDateVal);
+
+      let deliveredList = myOrders.filter(o => o.status === 'تم التسليم');
+      let rejectedList = myOrders.filter(o => o.status === 'تعذر التسليم');
+
+      let excelData = [["شركة " + state.company.companyName, "تقرير عمليات السائق", state.currentUser.name], ["التاريخ المحدد:", filterDateVal || "جميع الأوقات"], [""], ["الفواتير الواصلة بنجاح"], ["رقم الفاتورة", "اسم الزبون", "المندوب القاطع", "المبلغ", "الدفع"]];
+      deliveredList.forEach(o => { excelData.push([o.id, o.customerName, o.delegateName, o.totalPrice, o.paymentType]); });
+      excelData.push([""], ["الفواتير المرفوضة / متعذرة التسليم"], ["رقم الفاتورة", "اسم الزبون", "المندوب القاطع", "المبلغ", "سبب الرفض"]);
+      rejectedList.forEach(o => { excelData.push([o.id, o.customerName, o.delegateName, o.totalPrice, o.rejectReason || '']); });
+      const ws = XLSX.utils.aoa_to_sheet(excelData);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "تقرير السائق");
+      XLSX.writeFile(wb, `Driver_Report_${state.currentUser.name}.xlsx`);
+    }
+
+    function downloadDailyClosingPDF() {
+      prepareDailyReportData();
+      const element = document.getElementById('dailyReportExportContainer');
+      exportElementToPDF(element, 'Daily_Closing_Report.pdf');
+    }
+
+    function downloadDailyClosingExcel() {
+      let totalSales = 0, received = 0, debt = 0, comms = 0;
+      if(state.receipts) state.receipts.forEach(r => received += r.amount);
+      state.orders.forEach(o => {
+        totalSales += o.totalPrice;
+        if (o.status === 'تم التسليم' && o.paymentType === 'cash') received += o.totalPrice;
+        if (o.status === 'تم التسليم' && o.paymentType === 'partial') received += (o.paidAmount || 0);
+        if (o.paymentType === 'credit') debt += o.totalPrice;
+        if (o.paymentType === 'partial') debt += (o.totalPrice - (o.paidAmount || 0));
+        comms += o.delegateCommission;
+      });
+
+      let excelData = [["شركة " + state.company.companyName, "تقرير الإغلاق المالي اليومي"], [""], ["إجمالي المبيعات", totalSales], ["المبالغ الواصلة", received], ["ديون الآجل", debt], ["إجمالي العمولات", comms], [""], ["رقم الفاتورة", "اسم الزبون", "المندوب القاطع", "المبلغ", "الدفع", "الحالة"]];
+      state.orders.forEach(o => { excelData.push([o.id, o.customerName, o.delegateName, o.totalPrice, o.paymentType, o.status]); });
+
+      const ws = XLSX.utils.aoa_to_sheet(excelData);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "تقرير نهاية اليوم");
+      XLSX.writeFile(wb, `Daily_Closing.xlsx`);
+    }
+
+    function prepareDailyReportData() {
+      document.getElementById('reportCompanyName').innerText = "شركة " + state.company.companyName;
+      document.getElementById('reportDateString').innerText = "تاريخ التقرير: " + new Date().toLocaleDateString('ar-IQ');
+      document.getElementById('reportManagerName').innerText = state.company.managerName;
+
+      let totalSales = 0, received = 0, debt = 0, comms = 0, ordersRowsHtml = '';
+      if(state.receipts) state.receipts.forEach(r => received += r.amount);
+      state.orders.forEach(o => {
+        totalSales += o.totalPrice;
+        if (o.status === 'تم التسليم' && o.paymentType === 'cash') received += o.totalPrice;
+        if (o.status === 'تم التسليم' && o.paymentType === 'partial') received += (o.paidAmount || 0);
+        if (o.paymentType === 'credit') debt += o.totalPrice;
+        if (o.paymentType === 'partial') debt += (o.totalPrice - (o.paidAmount || 0));
+        comms += o.delegateCommission;
+        ordersRowsHtml += `<tr><td style="border: 1px solid #cbd5e1; padding: 5px;">#${o.id}</td><td style="border: 1px solid #cbd5e1; padding: 5px;">${o.customerName}</td><td style="border: 1px solid #cbd5e1; padding: 5px;">${o.delegateName}</td><td style="border: 1px solid #cbd5e1; padding: 5px;">${o.totalPrice.toLocaleString()} د.ع</td><td style="border: 1px solid #cbd5e1; padding: 5px;">${o.paymentType}</td><td style="border: 1px solid #cbd5e1; padding: 5px;">${o.status}</td></tr>`;
+      });
+
+      document.getElementById('reportSumTotalSales').innerText = totalSales.toLocaleString() + " د.ع";
+      document.getElementById('reportSumReceived').innerText = received.toLocaleString() + " د.ع";
+      document.getElementById('reportSumDebt').innerText = debt.toLocaleString() + " د.ع";
+      document.getElementById('reportSumCommissions').innerText = comms.toLocaleString() + " د.ع";
+      document.getElementById('reportOrdersTableBody').innerHTML = ordersRowsHtml || `<tr><td colspan="6" style="text-align:center;">لا توجد فواتير مسجلة.</td></tr>`;
+    }
+
+    function loadDelegateRouteInput() {
+      const delId = document.getElementById('routeSelectDelegate').value;
+      const input = document.getElementById('routeRegionsInput');
+      if(!delId) { input.value = ''; return; }
+      input.value = state.users.find(u => u.id == delId).assignedRegions || '';
+    }
+
+    function saveDelegateRouteRegions(e) {
+      e.preventDefault();
+      const delId = document.getElementById('routeSelectDelegate').value;
+      const regions = document.getElementById('routeRegionsInput').value.trim();
+      if(!delId) return;
+      state.users.find(u => u.id == delId).assignedRegions = regions;
+      saveData();
+      alert("تم حفظ خط السير.");
+    }
+
+    function approveDebtOrder(orderId) {
+      const order = state.orders.find(o => o.id === orderId);
+      if (!order) return;
+      order.approvalStatus = 'معتمد';
+      pushNotification('delegate', `اعتماد الفاتورة #${orderId}`, `تمت الموافقة من المدير.`);
+      saveData();
+      renderAdminView();
+    }
+
+    function rejectDebtOrder(orderId) {
+      const order = state.orders.find(o => o.id === orderId);
+      if (!order) return;
+      order.approvalStatus = 'مرفوض';
+      pushNotification('delegate', `رفض الفاتورة #${orderId}`, `تم رفض طلب الآجل.`);
+      saveData();
+      renderAdminView();
+    }
+
+    function readAndCompressLogoFile(file, maxDim = 420, quality = 0.78) {
+      return new Promise((resolve, reject) => {
+        if (!file) return resolve(null);
+        if (!file.type || !file.type.startsWith('image/')) return reject(new Error('الملف المختار ليس صورة صالحة.'));
+        const reader = new FileReader();
+        reader.onerror = () => reject(new Error('تعذرت قراءة ملف الصورة.'));
+        reader.onload = event => {
+          const img = new Image();
+          img.onerror = () => reject(new Error('تعذر فتح الصورة المختارة.'));
+          img.onload = () => {
+            const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+            const canvas = document.createElement('canvas');
+            canvas.width = Math.max(1, Math.round(img.width * scale));
+            canvas.height = Math.max(1, Math.round(img.height * scale));
+            const context = canvas.getContext('2d');
+            if (!context) return reject(new Error('تعذر تجهيز الصورة للحفظ.'));
+            context.drawImage(img, 0, 0, canvas.width, canvas.height);
+            resolve(canvas.toDataURL('image/jpeg', quality));
+          };
+          img.src = event.target.result;
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+
+    async function saveCompanySettings(e) {
+      e.preventDefault();
+      const saveButton = e.submitter || e.target.querySelector('button[type="submit"]');
+      const originalButtonText = saveButton ? saveButton.textContent : '';
+      if (saveButton) { saveButton.disabled = true; saveButton.textContent = 'جارٍ الحفظ...'; }
+
+      try {
+        const managerPhone = document.getElementById('settingPhone').value.trim();
+        if (!managerPhone) throw new Error('أدخل رقم هاتف المدير قبل الحفظ.');
+
+        state.company.name = document.getElementById('settingSystemName').value.trim();
+        state.company.companyName = document.getElementById('settingCompanyName').value.trim();
+        state.company.managerName = document.getElementById('settingManagerName').value.trim();
+        state.company.phone = managerPhone;
+        state.company.complaintsPhone = document.getElementById('settingComplaintsPhone').value.trim();
+        state.company.programCredit = document.getElementById('settingProgramCredit').value.trim();
+        state.company.invoiceSlogan = document.getElementById('settingInvoiceSlogan').value.trim();
+        state.company.broadcastText = document.getElementById('settingBroadcastText').value.trim();
+
+        // تحديث رقم المدير في سجل المستخدم أيضاً حتى لا تعيد الواجهة الرقم القديم.
+        const adminUser = (state.users || []).find(u =>
+          u.role === 'admin' && (
+            (state.currentUser && String(u.id) === String(state.currentUser.id)) ||
+            String(u.email || '').toLowerCase() === String(auth && auth.currentUser && auth.currentUser.email || '').toLowerCase()
+          )
+        ) || (state.users || []).find(u => u.role === 'admin');
+        if (adminUser) {
+          adminUser.phone = managerPhone;
+          if (state.currentUser && state.currentUser.role === 'admin' &&
+              String(state.currentUser.id) === String(adminUser.id)) {
+            state.currentUser.phone = managerPhone;
+          }
+        }
+
+        const systemLogoFile = document.getElementById('settingLogoFile').files[0] || null;
+        const loginLogoFile = document.getElementById('settingLoginLogoFile').files[0] || null;
+
+        if (systemLogoFile) {
+          state.company.logoUrl = await readAndCompressLogoFile(systemLogoFile, 420, 0.78);
+        }
+        if (loginLogoFile) {
+          state.company.loginLogoUrl = await readAndCompressLogoFile(loginLogoFile, 420, 0.78);
+        }
+
+        // حفظ محلي ثم انتظار كتابة مستقلة مؤكدة إلى Firestore بدلاً من إظهار نجاح مبكر.
+        saveLocalBackup();
+        if (db && auth && auth.currentUser && firestoreReady) {
+          firestoreSaveQueue = firestoreSaveQueue.then(() => persistStateToFirestore());
+          try {
+            await firestoreSaveQueue;
+          } catch (cloudError) {
+            updateCloudSyncBadge('🟡 تعذر حفظ الإعدادات في Firebase', '#facc15');
+            throw cloudError;
+          }
+        } else {
+          throw new Error('لا يوجد اتصال جاهز بـ Firebase؛ تم الاحتفاظ بالتغييرات محلياً فقط. أعد المحاولة بعد عودة الاتصال.');
+        }
+
+        applySystemBranding();
+        if (typeof setupDashboardView === 'function' && state.currentUser) {
+          document.getElementById('currentUserPhone').innerText = state.currentUser.phone || managerPhone;
+          setupDashboardView();
+        }
+        document.getElementById('settingLogoFile').value = '';
+        document.getElementById('settingLoginLogoFile').value = '';
+        alert('تم حفظ إعدادات الشركة ورقم هاتف المدير والشعارات في Firebase بنجاح.');
+      } catch (error) {
+        console.error('Company settings save failed:', error);
+        alert('تعذر تأكيد الحفظ في Firebase: ' + (error.message || error));
+      } finally {
+        if (saveButton) { saveButton.disabled = false; saveButton.textContent = originalButtonText || 'حفظ وتحديث النظام'; }
+      }
+    }
+
+    document.addEventListener('change', async function(event) {
+      if (event.target && event.target.id === 'settingLoginLogoFile') {
+        const preview = document.getElementById('settingLoginLogoPreview');
+        const file = event.target.files && event.target.files[0];
+        if (!preview || !file) return;
+        try {
+          const dataUrl = await readAndCompressLogoFile(file, 420, 0.78);
+          preview.innerHTML = dataUrl
+            ? `<img src="${dataUrl}" alt="معاينة شعار تسجيل الدخول">`
+            : 'لم يتم اختيار شعار';
+        } catch (error) {
+          preview.textContent = error.message || 'تعذر عرض الصورة.';
+        }
+      }
+    });
+
+    function updateDelegatePhone(e) {
+      e.preventDefault();
+      state.currentUser.phone = document.getElementById('delProfilePhone').value.trim();
+      saveData();
+      alert("تم التحديث.");
+      setupDashboardView();
+    }
+
+    function deleteProduct(productId) {
+      const product = (state.products || []).find(p => String(p.id) === String(productId));
+      if (!product) return alert('تعذر العثور على المنتج المطلوب.');
+      const linkedItems = (state.orders || []).reduce((count, order) =>
+        count + (order.items || []).filter(item => String(item.productId) === String(productId)).length, 0);
+      const warning = linkedItems
+        ? `سيتم حذف المنتج "${product.name}" من المخزون وقائمة المنتجات النشطة. توجد ${linkedItems} تفاصيل منتج محفوظة داخل فواتير سابقة وستبقى محفوظة كما هي.`
+        : `هل تريد حذف المنتج "${product.name}" نهائياً من قائمة المنتجات والمخزون؟`;
+      if (!confirm(`${warning}\n\nلا يمكن التراجع عن حذف المنتج من المخزون. متابعة؟`)) return;
+      state.products = (state.products || []).filter(p => String(p.id) !== String(productId));
+      saveData();
+      renderAdminView();
+      alert('تم حذف المنتج من قائمة المنتجات والمخزون. الفواتير السابقة بقيت محفوظة.');
+    }
+
+    function addProduct(e) {
+      e.preventDefault();
+      const fileInput = document.getElementById('prodImageFile');
+      let flavors = [];
+      let totalCalcStock = 0;
+      document.querySelectorAll('.flavor-row').forEach(row => {
+        let fName = row.querySelector('.flav-name').value.trim();
+        let fQty = parseInt(row.querySelector('.flav-qty').value) || 0;
+        if(fName) { flavors.push({ name: fName, stock: fQty }); totalCalcStock += fQty; }
+      });
+
+      const manualTotalStock = parseInt(document.getElementById('prodTotalStock').value) || 0;
+      const finalStock = totalCalcStock > 0 ? totalCalcStock : manualTotalStock;
+
+      const newP = {
+        id: Date.now(),
+        name: document.getElementById('prodName').value.trim(),
+        desc: document.getElementById('prodDesc').value.trim(),
+        price: parseFloat(document.getElementById('prodPrice').value) || 0,
+        totalStock: finalStock,
+        flavors: flavors,
+        commission: parseFloat(document.getElementById('prodCommission').value) || 0,
+        minQtyDiscount: parseInt(document.getElementById('discountMinQty').value) || 0,
+        discountPerCarton: parseFloat(document.getElementById('discountAmountPerCarton').value) || 0,
+        image: "",
+        active: true
+      };
+
+      const finishAddingProduct = (base64Img) => {
+        newP.image = base64Img;
+        state.products.push(newP);
+        pushNotification('delegate', 'منتج جديد متوفر!', `أضاف المدير منتج "${newP.name}" بسعر ${newP.price.toLocaleString()} د.ع`);
+        saveData();
+        renderAdminView();
+        e.target.reset();
+        alert("تم حفظ المنتج ورفعه إلى سلة المنتجات عند المندوب فوراً!");
+      };
+
+      if (fileInput.files && fileInput.files[0]) {
+        const reader = new FileReader();
+        reader.onload = function(event) {
+          const img = new Image();
+          img.onload = function() {
+            const canvas = document.createElement('canvas');
+            const maxDim = 400;
+            let w = img.width, h = img.height;
+            if (w > h && w > maxDim) { h *= maxDim / w; w = maxDim; }
+            else if (h > maxDim) { w *= maxDim / h; h = maxDim; }
+            canvas.width = w;
+            canvas.height = h;
+            canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+            finishAddingProduct(canvas.toDataURL('image/jpeg', 0.75));
+          };
+          img.src = event.target.result;
+        };
+        reader.readAsDataURL(fileInput.files[0]);
+      } else {
+        finishAddingProduct("");
+      }
+    }
+
+    function openInventoryManagement() {
+      const card = document.getElementById('inventoryManagementCard');
+      if (card) card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    function adjustProductStock(productId, flavorIndex, action) {
+      const product = state.products.find(item => item.id === productId);
+      if (!product) return alert('لم يتم العثور على المنتج.');
+      const amountText = prompt('أدخل عدد الكراتين المراد ' + (action === 'add' ? 'إضافتها' : 'خصمها') + ':', '1');
+      if (amountText === null) return;
+      const amount = Number(amountText);
+      if (!Number.isInteger(amount) || amount <= 0) return alert('أدخل كمية صحيحة أكبر من صفر.');
+      const reason = prompt('اكتب سبب حركة المخزون (مثلاً: بضاعة جديدة أو تلف):');
+      if (reason === null) return;
+      if (flavorIndex >= 0) {
+        const flavor = (product.flavors || [])[flavorIndex];
+        if (!flavor) return alert('لم يتم العثور على النكهة.');
+        if (action === 'remove' && Number(flavor.stock || 0) < amount) return alert('الكمية المطلوبة أكبر من مخزون هذه النكهة.');
+        flavor.stock = Number(flavor.stock || 0) + (action === 'add' ? amount : -amount);
+      } else if (action === 'remove' && Number(product.totalStock || 0) < amount) {
+        return alert('الكمية المطلوبة أكبر من المخزون الكلي.');
+      }
+      product.totalStock = Number(product.totalStock || 0) + (action === 'add' ? amount : -amount);
+      product.stockUpdatedAt = new Date().toISOString();
+      product.stockLastReason = reason.trim();
+      saveData();
+      renderAdminView();
+      alert('تم تحديث المخزون محلياً وإرسال التغييرات إلى Firebase.');
+    }
+
+    function toggleProduct(id) {
+      const p = state.products.find(x => x.id === id);
+      if(p) { p.active = !p.active; saveData(); renderAdminView(); }
+    }
+
+    function assignDriverToOrder(orderId) {
+      const drvId = document.getElementById(`assignDrvSelect_${orderId}`).value;
+      if (!drvId) return alert("اختر السائق أولاً.");
+      const order = state.orders.find(o => o.id === orderId);
+      const driver = state.users.find(u => u.id == drvId);
+      order.driverId = parseInt(drvId);
+      order.status = 'قيد التجهيز';
+      pushNotification('driver', `طلب توصيل جديد #${orderId}`, `تم إسناد فاتورة جديدة للزبون ${order.customerName}`);
+      saveData();
+      alert(`تم تحويل الفاتورة إلى السائق (${driver.name}).`);
+      renderAdminView();
+    }
+
+    function renderDelegateView() {
+      renderCustomerAccountsPanel('delegate');
+      customerSearchScope = 'mine';
+      const scopeControls = document.getElementById('delegateCustomerScopeControls');
+      if (scopeControls) scopeControls.classList.remove('hidden');
+      const mineBtn = document.getElementById('customerScopeMineBtn');
+      const allBtn = document.getElementById('customerScopeAllBtn');
+      if (mineBtn) mineBtn.classList.add('active');
+      if (allBtn) allBtn.classList.remove('active');
+      const searchInput = document.getElementById('customerSearchFilterInput');
+      renderCustomerDropdown(searchInput ? searchInput.value : '');
+      document.getElementById('delProfileName').value = state.currentUser.name;
+      document.getElementById('delProfilePhone').value = state.currentUser.phone;
+      document.getElementById('delegateAssignedRegionsBox').innerText = state.currentUser.assignedRegions || "لم يتم تحديد مناطق.";
+
+      const myOrders = state.orders.filter(o => o.delegateId === state.currentUser.id);
+      let salesSum = 0, commBalance = 0, myTotalDebt = 0;
+      myOrders.forEach(o => {
+        salesSum += o.totalPrice;
+        if(!o.commissionCleared) commBalance += o.delegateCommission;
+        if ((o.paymentType === 'credit' || o.paymentType === 'partial') && o.approvalStatus === 'معتمد') {
+          let paidSoFar = (o.paidAmount || 0) + (o.partialPaidHistory ? o.partialPaidHistory.reduce((sum, item) => sum + item.amount, 0) : 0);
+          myTotalDebt += (o.totalPrice - paidSoFar);
+        }
+      });
+
+      commBalance += (state.commissionAdjustments || []).filter(a => String(a.delegateId) === String(state.currentUser.id) && !a.cleared).reduce((sum,a)=>sum+Number(a.amount||0),0);
+      document.getElementById('delTotalSales').innerText = salesSum.toLocaleString() + " د.ع";
+      document.getElementById('delOrdersCount').innerText = myOrders.length;
+      document.getElementById('delCustomersCount').innerText = state.customers.length;
+      document.getElementById('delCommissionBalance').innerText = commBalance.toLocaleString() + " د.ع";
+      document.getElementById('delTotalDebtMyOrders').innerText = myTotalDebt.toLocaleString() + " د.ع";
+
+      const shopGrid = document.getElementById('productShopGrid');
+      shopGrid.innerHTML = '';
+      const activeProducts = (state.products || []).filter(p => p.active !== false);
+
+      if (activeProducts.length === 0) {
+        shopGrid.innerHTML = `<div style="grid-column: 1 / -1; text-align:center; padding:25px; background:#f8fafc; border-radius:8px; border:1px dashed #94a3b8; color:#475569;">لا توجد منتجات مضافة من المدير حالياً.</div>`;
+      } else {
+        activeProducts.forEach(p => {
+          const flavorsList = Array.isArray(p.flavors) ? p.flavors : [];
+          let flavorsOptions = flavorsList.length > 0 
+            ? flavorsList.map(f => `<option value="${f.name}">${f.name} (متوفر: ${f.stock})</option>`).join('')
+            : `<option value="قياسي">قياسي (متوفر: ${p.totalStock})</option>`;
+          
+          let flavorsBadges = flavorsList.map(f => `<span style="background:#e0f2fe; color:#0369a1; font-size:0.7rem; padding:2px 6px; border-radius:4px; margin-left:4px;">${f.name}: ${f.stock}</span>`).join('');
+
+          const imgTag = p.image ? `<img src="${p.image}" alt="${p.name}">` : `<div style="width:90px;height:90px;background:#e2e8f0;display:flex;align-items:center;justify-content:center;font-size:0.75rem;color:#64748b;border-radius:10px;flex-shrink:0;">لا توجد صورة</div>`;
+          const discountInfo = (p.minQtyDiscount > 0 && p.discountPerCarton > 0) ? `<div style="font-size:0.75rem; color:#15803d; background:#dcfce7; padding:3px 6px; border-radius:4px; margin-top:4px;">🏷️ خصم ${p.discountPerCarton.toLocaleString()} د.ع/كارتون عند طلب ${p.minQtyDiscount} كارتون فأكثر</div>` : '';
+
+          shopGrid.innerHTML += `
+            <div class="product-shop-card" id="prodCard_${p.id}" onclick="toggleProductCardSelection(${p.id})">
+              <div class="product-card-top">
+                ${imgTag}
+                <div style="flex:1;">
+                  <h4 style="font-size: 1rem; margin-bottom: 3px; color:#0f172a;">${p.name}</h4>
+                  <p style="font-size: 0.8rem; color: #475569; margin-bottom:4px;">${p.desc || 'بدون وصف إضافي'}</p>
+                  <p style="font-size: 0.9rem; color: #0284c7; font-weight:bold;">السعر: ${p.price.toLocaleString()} د.ع</p>
+                  <p style="font-size: 0.78rem; color: #334155; margin-top:2px;">المخزون الكلي: <strong>${p.totalStock} كارتون</strong></p>
+                  <div style="margin-top:4px;">${flavorsBadges}</div>
+                  ${discountInfo}
+                </div>
+              </div>
+              <div class="product-interactive-fields" onclick="event.stopPropagation()">
+                <div class="interactive-row-horizontal">
+                  <div>
+                    <label>النكهة:</label>
+                    <select id="shopFlavor_${p.id}">${flavorsOptions}</select>
+                  </div>
+                  <div>
+                    <label>الكمية (كارتون):</label>
+                    <input type="number" id="shopQty_${p.id}" min="1" step="1" value="1" inputmode="numeric" aria-label="عدد الكراتين">
+                  </div>
+                  <div>
+                    <label>السعر (د.ع):</label>
+                    <input type="number" id="shopPrice_${p.id}" min="0" step="1" value="${p.price}" inputmode="numeric" aria-label="سعر الكارتون">
+                  </div>
+                  <div style="min-width: 90px;">
+                    <button type="button" class="btn-success full-width" onclick="addSelectedProductToCart(${p.id})" style="padding:7px; font-size:0.85rem; margin-top:0;">➕ إضافة للسلة</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          `;
+        });
+      }
+
+      const filterDateVal = document.getElementById('delegateReportFilterDate').value;
+      let reportOrders = [...myOrders];
+      let reportReceipts = state.receipts.filter(r => r.issuerId === state.currentUser.id);
+
+      if (filterDateVal) {
+        reportOrders = reportOrders.filter(o => o.rawDate === filterDateVal);
+        reportReceipts = reportReceipts.filter(r => r.rawDate === filterDateVal);
+      }
+
+      let repTotalSales = reportOrders.reduce((s, o) => s + o.totalPrice, 0);
+      let repTotalReceipts = reportReceipts.reduce((s, r) => s + r.amount, 0);
+      document.getElementById('delegateReportSummaryBox').innerHTML = `📊 ملخص تقرير المندوب: عدد الفواتير = <strong>${reportOrders.length}</strong> | إجمالي المبيعات = <strong style="color:#0284c7;">${repTotalSales.toLocaleString()} د.ع</strong> | عدد سندات القبض = <strong>${reportReceipts.length}</strong> | إجمالي القبض النقدي = <strong style="color:#16a34a;">${repTotalReceipts.toLocaleString()} د.ع</strong>`;
+
+      document.getElementById('delegateReportOrdersContainer').innerHTML = reportOrders.length === 0 ? `<p style="color:#64748b; font-size:0.85rem;">لا توجد فواتير مسجلة في هذا التاريخ.</p>` :
+        `<table class="data-table"><thead><tr><th>رقم الفاتورة</th><th>الزبون</th><th>المبلغ</th><th>الدفع</th><th>الحالة</th></tr></thead><tbody>` +
+        reportOrders.slice().reverse().map(o => `<tr><td>#${o.id}</td><td>${o.customerName}</td><td>${o.totalPrice.toLocaleString()} د.ع</td><td>${o.paymentType}</td><td><span class="badge" style="background:#0284c7">${o.status}</span></td></tr>`).join('') + `</tbody></table>`;
+
+      document.getElementById('delegateReportReceiptsContainer').innerHTML = reportReceipts.length === 0 ? `<p style="color:#64748b; font-size:0.85rem;">لا توجد سندات قبض مسجلة في هذا التاريخ.</p>` :
+        `<table class="data-table"><thead><tr><th>رقم السند</th><th>الزبون</th><th>المبلغ المستلم</th><th>التاريخ</th></tr></thead><tbody>` +
+        reportReceipts.slice().reverse().map(r => `<tr><td>#${r.id}</td><td>${r.customerName} ${customerMapButton(r.customerId)}</td><td style="color:#16a34a; font-weight:bold;">${r.amount.toLocaleString()} د.ع</td><td>${r.date}</td></tr>`).join('') + `</tbody></table>`;
+
+      const delegateDebtContainer = document.getElementById('delegateDebtOrdersContainer');
+      const myDebtOrders = myOrders.filter(o => o.paymentType === 'credit' || o.paymentType === 'partial');
+      delegateDebtContainer.innerHTML = myDebtOrders.length === 0 ? `<p style="color:#64748b;">لا توجد فواتير آجل.</p>` :
+        `<table class="data-table"><thead><tr><th>رقم الفاتورة</th><th>الزبون والمحل</th><th>المبلغ</th><th>المتبقي</th><th>الحالة</th></tr></thead><tbody>` +
+        myDebtOrders.map(o => {
+          let paidSoFar = (o.paidAmount || 0) + (o.partialPaidHistory ? o.partialPaidHistory.reduce((sum, item) => sum + item.amount, 0) : 0);
+          return `<tr><td>#${o.id}</td><td>${o.customerName}</td><td>${o.totalPrice.toLocaleString()} د.ع</td><td><strong style="color:#b45309;">${(o.totalPrice - paidSoFar).toLocaleString()} د.ع</strong></td><td>${o.approvalStatus || 'قيد الموافقة'}</td></tr>`;
+        }).join('') + `</tbody></table>`;
+
+      renderCustomerDropdown();
+      renderStatementCustomerDropdown();
+      renderReceiptCustomerDropdown();
+      renderReturnProductDropdown();
+      renderEmptyVisitCustomerDropdown();
+
+      const table = document.getElementById('delegateOrdersTableBody');
+      table.innerHTML = '';
+      myOrders.forEach(o => {
+        let whatsappManagerBtn = (o.paymentType === 'credit' || o.paymentType === 'partial') ? `<button class="btn-share" style="background:#f59e0b; margin-top:3px;" onclick="sendDebtAlertToManager(${o.id})">📲 إشعار واتساب للمدير</button>` : '';
+        table.innerHTML += `<tr><td>#${o.id}</td><td>${o.customerName}</td><td>${o.totalPrice.toLocaleString()} د.ع</td><td><strong style="color:green">${o.delegateCommission.toLocaleString()} د.ع</strong></td><td>${o.paymentType}</td><td>${o.status}</td><td><button class="btn-secondary" onclick="openInvoicePrint(${o.id})">فاتورة</button> <button class="btn-share" onclick="shareOrderWhatsAppAdvanced(${o.id})">📤 واتساب للزبون</button> ${whatsappManagerBtn}</td></tr>`;
+      });
+      renderCartItemsTable();
+    }
+
+    function sortCustomersByProximity() {
+      if (!navigator.geolocation) return alert("GPS غير مدعوم في متصفحك.");
+      navigator.geolocation.getCurrentPosition((pos) => {
+        const curLat = pos.coords.latitude;
+        const curLon = pos.coords.longitude;
+        state.customers.forEach(c => {
+          if (c.gps) {
+            const parts = c.gps.split(',');
+            if (parts.length === 2) {
+              c.tempDistance = Math.sqrt(Math.pow(parseFloat(parts[0]) - curLat, 2) + Math.pow(parseFloat(parts[1]) - curLon, 2));
+            } else { c.tempDistance = 99999; }
+          } else { c.tempDistance = 99999; }
+        });
+        state.customers.sort((a, b) => a.tempDistance - b.tempDistance);
+        renderCustomerDropdown();
+        renderStatementCustomerDropdown();
+        renderReceiptCustomerDropdown();
+        renderEmptyVisitCustomerDropdown();
+        alert("تم إعادة ترتيب قائمة الزبائن جغرافياً (الأقرب لموقعك الحالي أولاً).");
+      }, () => { alert("تعذر جلب موقعك الحالي لتنظيم المسار الجغرافي."); });
+    }
+
+
+    // بحث المندوب: الوضع الافتراضي يعرض الزبائن الذين أضافهم هذا المندوب فقط.
+    let customerSearchScope = 'mine';
+
+    function getCustomerCreatorId(customer) {
+      if (!customer) return null;
+      return customer.createdById ?? customer.addedById ?? customer.delegateId ?? customer.createdBy ?? null;
+    }
+
+    function getCustomersForInvoiceSearch() {
+      const user = state.currentUser || {};
+      if (user.role !== 'delegate') return state.customers || [];
+      if (customerSearchScope === 'all') return state.customers || [];
+      return (state.customers || []).filter(customer =>
+        String(getCustomerCreatorId(customer) ?? '') === String(user.id)
+      );
+    }
+
+    function setCustomerSearchScope(scope) {
+      customerSearchScope = scope === 'all' ? 'all' : 'mine';
+      const mineBtn = document.getElementById('customerScopeMineBtn');
+      const allBtn = document.getElementById('customerScopeAllBtn');
+      if (mineBtn) mineBtn.classList.toggle('active', customerSearchScope === 'mine');
+      if (allBtn) allBtn.classList.toggle('active', customerSearchScope === 'all');
+      filterCustomerDropdown();
+    }
+
+    function getCustomerById(customerId) {
+      return (state.customers || []).find(customer => String(customer.id) === String(customerId));
+    }
+
+    function openCustomerMap(customerId) {
+      const customer = getCustomerById(customerId);
+      if (!customer || !customer.gps) return alert('لا توجد إحداثيات GPS محفوظة لهذا العميل.');
+      const parts = String(customer.gps).split(',').map(value => Number(value.trim()));
+      if (parts.length !== 2 || !Number.isFinite(parts[0]) || !Number.isFinite(parts[1])) {
+        return alert('إحداثيات موقع العميل غير صالحة.');
+      }
+      const url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(parts[0] + ',' + parts[1])}`;
+      window.open(url, '_blank', 'noopener');
+    }
+
+    function customerMapButton(customerId) {
+      const customer = getCustomerById(customerId);
+      if (!customer || !customer.gps) return '<span style="color:#94a3b8;font-size:.75rem;">لا يوجد موقع</span>';
+      return `<button type="button" class="customer-map-link" onclick="openCustomerMap('${String(customer.id).replace(/'/g, '')}')">📍 الموقع</button>`;
+    }
+
+    function renderCustomerSearchResults(filter = '') {
+      const box = document.getElementById('customerSearchResults');
+      if (!box) return;
+      const query = String(filter || '').trim().toLowerCase();
+      const candidates = getCustomersForInvoiceSearch().filter(customer => {
+        const name = String(customer.name || '').toLowerCase();
+        const store = String(customer.storeName || '').toLowerCase();
+        const phone = String(customer.phone || '').toLowerCase();
+        return !query || name.includes(query) || store.includes(query) || phone.includes(query);
+      }).slice(0, 12);
+
+      if (!query) {
+        box.innerHTML = '';
+        return;
+      }
+      if (!candidates.length) {
+        box.innerHTML = '<div class="muted-note">لا توجد نتائج ضمن نطاق البحث المختار.</div>';
+        return;
+      }
+      box.innerHTML = candidates.map(customer => `
+        <div class="customer-search-result">
+          <div class="customer-search-meta">
+            <strong>${customer.name || 'بدون اسم'} — ${customer.storeName || 'بدون اسم محل'}</strong>
+            <small>${customer.phone || 'بدون هاتف'}</small>
+          </div>
+          <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+            <button type="button" class="btn-primary" style="padding:7px 10px;font-size:.78rem;" onclick="selectInvoiceCustomer('${String(customer.id).replace(/'/g, '')}')">اختيار</button>
+            ${customerMapButton(customer.id)}
+          </div>
+        </div>`).join('');
+    }
+
+    function selectInvoiceCustomer(customerId) {
+      const select = document.getElementById('invoiceCustomerSelect');
+      if (!select) return;
+      select.value = String(customerId);
+      if (select.value !== String(customerId)) {
+        renderCustomerDropdown(document.getElementById('customerSearchFilterInput')?.value || '');
+        select.value = String(customerId);
+      }
+      select.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+
+    function renderCustomerDropdown(filter = "") {
+      const select = document.getElementById('invoiceCustomerSelect');
+      if(!select) return;
+      const normalizedFilter = String(filter || '').toLowerCase().trim();
+      const filtered = getCustomersForInvoiceSearch().filter(c =>
+        String(c.name || '').toLowerCase().includes(normalizedFilter) ||
+        String(c.storeName || '').toLowerCase().includes(normalizedFilter) ||
+        String(c.phone || '').toLowerCase().includes(normalizedFilter)
+      );
+      const previousValue = select.value;
+      select.innerHTML = '<option value="">اختر الزبون والمحل...</option>' + filtered.map(c =>
+        `<option value="${c.id}">${c.name} - محل: (${c.storeName || 'بدون'}) | هاتف: ${c.phone || '—'}${c.gps ? ' 📍' : ''}</option>`
+      ).join('');
+      if (filtered.some(c => String(c.id) === String(previousValue))) select.value = previousValue;
+      renderCustomerSearchResults(filter);
+    }
+
+    function renderStatementCustomerDropdown() {
+      const select = document.getElementById('statementCustomerSelect');
+      if(select) select.innerHTML = '<option value="">اختر الزبون...</option>' + state.customers.map(c => `<option value="${c.id}">${c.name} - محل: (${c.storeName || 'بدون'})</option>`).join('');
+    }
+
+    function renderReceiptCustomerDropdown() {
+      const select = document.getElementById('receiptCustomerSelect');
+      if(select) select.innerHTML = '<option value="">اختر الزبون...</option>' + state.customers.map(c => `<option value="${c.id}">${c.name} - محل: (${c.storeName || 'بدون'})</option>`).join('');
+      const driverSelect = document.getElementById('driverReceiptCustomerSelect');
+      if(driverSelect) driverSelect.innerHTML = '<option value="">اختر الزبون...</option>' + state.customers.map(c => `<option value="${c.id}">${c.name} - محل: (${c.storeName || 'بدون'})</option>`).join('');
+    }
+
+    function renderReturnProductDropdown() {
+      const custSelect = document.getElementById('returnCustomerSelect');
+      if(custSelect) custSelect.innerHTML = '<option value="">اختر الزبون...</option>' + state.customers.map(c => `<option value="${c.id}">${c.name} - محل: (${c.storeName || 'بدون'})</option>`).join('');
+      const prodSelect = document.getElementById('returnProductSelect');
+      if(prodSelect) prodSelect.innerHTML = '<option value="">اختر المنتج...</option>' + state.products.map(p => `<option value="${p.name}">${p.name} (${p.price} د.ع)</option>`).join('');
+    }
+
+    function renderEmptyVisitCustomerDropdown() {
+      const select = document.getElementById('emptyVisitCustomerSelect');
+      if(select) select.innerHTML = '<option value="">اختر الزبون أو المحل...</option>' + state.customers.map(c => `<option value="${c.id}">${c.name} - محل: (${c.storeName || 'بدون'})</option>`).join('');
+    }
+
+    function filterCustomerDropdown() {
+      renderCustomerDropdown(document.getElementById('customerSearchFilterInput')?.value || '');
+    }
+
+    function toggleProductCardSelection(productId) {
+      document.querySelectorAll('.product-shop-card').forEach(c => c.classList.remove('selected'));
+      const card = document.getElementById(`prodCard_${productId}`);
+      if(card) card.classList.add('selected');
+    }
+
+    // يجمع كميات النكهات المختلفة للمنتج نفسه بشرط تطابق سعر الكارتون.
+    // عند بلوغ الحد الذي حدده المدير، يطبق الخصم على كل كراتين المجموعة.
+    function recalculateCartDiscounts() {
+      const groups = new Map();
+      currentCartItems.forEach(item => {
+        const basePrice = Number(item.baseUnitPrice ?? item.unitPrice ?? 0);
+        item.baseUnitPrice = basePrice;
+        const key = `${String(item.productId)}__${basePrice}`;
+        if (!groups.has(key)) groups.set(key, { quantity: 0, items: [], product: state.products.find(p => String(p.id) === String(item.productId)) });
+        const group = groups.get(key);
+        group.quantity += Number(item.quantity || 0);
+        group.items.push(item);
+      });
+
+      groups.forEach(group => {
+        const product = group.product;
+        const minQty = Number(product?.minQtyDiscount || 0);
+        const discount = Number(product?.discountPerCarton || 0);
+        const qualifies = minQty > 0 && discount > 0 && group.quantity >= minQty;
+        group.items.forEach(item => {
+          const basePrice = Number(item.baseUnitPrice || 0);
+          const finalUnitPrice = qualifies ? Math.max(0, basePrice - discount) : basePrice;
+          item.unitPrice = finalUnitPrice;
+          item.totalPrice = finalUnitPrice * Number(item.quantity || 0);
+          item.discountApplied = qualifies ? discount : 0;
+        });
+      });
+      localStorage.setItem('app_current_cart', JSON.stringify(currentCartItems));
+    }
+
+    function addSelectedProductToCart(productId) {
+      const prod = state.products.find(p => String(p.id) === String(productId));
+      if (!prod) return alert("تعذر العثور على المنتج.");
+      const flavorName = document.getElementById(`shopFlavor_${productId}`).value;
+      const qty = parseInt(document.getElementById(`shopQty_${productId}`).value) || 0;
+      const baseUnitPrice = parseFloat(document.getElementById(`shopPrice_${productId}`).value);
+      const enteredPrice = Number.isFinite(baseUnitPrice) && baseUnitPrice > 0 ? baseUnitPrice : Number(prod.price || 0);
+
+      if (!flavorName) return alert("اختر النكهة.");
+      if (qty <= 0) return alert("أدخل كمية صحيحة.");
+
+      currentCartItems.push({
+        productId: prod.id,
+        productName: prod.name,
+        flavor: flavorName,
+        baseUnitPrice: enteredPrice,
+        unitPrice: enteredPrice,
+        quantity: qty,
+        totalPrice: enteredPrice * qty,
+        unitCommission: prod.commission,
+        totalCommission: prod.commission * qty
+      });
+
+      recalculateCartDiscounts();
+      renderCartItemsTable();
+    }
+
+    function removeCartItem(index) {
+      currentCartItems.splice(index, 1);
+      recalculateCartDiscounts();
+      renderCartItemsTable();
+    }
+
+    function renderCartItemsTable() {
+      recalculateCartDiscounts();
+      const tbody = document.getElementById('cartItemsTableBody');
+      if(!tbody) return;
+      tbody.innerHTML = '';
+      let grandTotal = 0;
+      if(currentCartItems.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: #64748b;">السلة فارغة.</td></tr>`;
+        document.getElementById('cartGrandTotalPreview').innerText = "0";
+        return;
+      }
+      currentCartItems.forEach((item, idx) => {
+        grandTotal += Number(item.totalPrice || 0);
+        tbody.innerHTML += `<tr><td><strong>${item.productName || '—'}</strong></td><td>${item.flavor || '—'}</td><td>${Number(item.quantity || 0).toLocaleString()} كارتون</td><td>${Number(item.unitPrice || 0).toLocaleString()} د.ع</td><td><strong>${Number(item.totalPrice || 0).toLocaleString()} د.ع</strong></td><td><button type="button" class="btn-danger" onclick="removeCartItem(${idx})">حذف</button></td></tr>`;
+      });
+      document.getElementById('cartGrandTotalPreview').innerText = grandTotal.toLocaleString();
+    }
+
+    function captureGPS() {
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition((pos) => {
+          document.getElementById('custGps').value = `${pos.coords.latitude.toFixed(5)},${pos.coords.longitude.toFixed(5)}`;
+          alert("تم التقاط موقعك الحالي (GPS) بنجاح.");
+        }, () => alert("تعذر جلب الموقع. تأكد من تفعيل خدمة GPS في متصفحك."));
+      } else {
+        alert("خدمة الـ GPS غير مدعومة في متصفحك.");
+      }
+    }
+
+    function saveCustomer(e) {
+      e.preventDefault();
+      const gpsVal = document.getElementById('custGps').value.trim();
+      if(!gpsVal) return alert("الرجاء الضغط على زر 'التقاط موقعي الحالي (GPS)' لتحديد إحداثيات الزبون أولاً.");
+
+      const countryCode = document.getElementById('custCountryCode').value.trim();
+      const phoneNum = document.getElementById('custPhoneNum').value.trim();
+      state.customers.push({
+        id: Date.now(),
+        name: document.getElementById('custName').value.trim(),
+        storeName: document.getElementById('custStoreName').value.trim(),
+        phone: countryCode + phoneNum,
+        address: document.getElementById('custAddress').value.trim(),
+        gps: gpsVal,
+        createdById: state.currentUser ? state.currentUser.id : null,
+        createdByName: state.currentUser ? state.currentUser.name : '',
+        createdByRole: state.currentUser ? state.currentUser.role : ''
+      });
+      saveData();
+      alert("تم حفظ الزبون الجديد مع موقع GPS بنجاح.");
+      e.target.reset();
+      document.getElementById('custCountryCode').value = '+964';
+      renderDelegateView();
+    }
+
+    function saveEmptyVisit(e) {
+      e.preventDefault();
+      const custId = document.getElementById('emptyVisitCustomerSelect').value;
+      const notes = document.getElementById('emptyVisitNotes').value.trim();
+      if(!custId) return alert("اختر الزبون.");
+      const cust = state.customers.find(c => c.id == custId);
+      const now = new Date();
+      if(!state.emptyVisits) state.emptyVisits = [];
+      state.emptyVisits.push({
+        id: Date.now(),
+        delegateId: state.currentUser.id,
+        delegateName: state.currentUser.name,
+        customerId: cust.id,
+        customerName: `${cust.name} (${cust.storeName || 'بدون محل'})`,
+        notes: notes,
+        time: now.toLocaleTimeString('ar-IQ'),
+        rawDate: now.toISOString().slice(0,10)
+      });
+      saveData();
+      document.getElementById('emptyVisitNotes').value = '';
+      alert("تم توثيق الزيارة الفارغة بنجاح.");
+      renderDelegateView();
+    }
+
+    function saveReturnItem(e) {
+      e.preventDefault();
+      const custId = document.getElementById('returnCustomerSelect').value;
+      const productName = document.getElementById('returnProductSelect').value;
+      const qty = parseInt(document.getElementById('returnQty').value) || 0;
+      const reason = document.getElementById('returnReason').value;
+      if(!custId) return alert("اختر الزبون.");
+      const cust = state.customers.find(c => c.id == custId);
+      const now = new Date();
+      if(!state.returns) state.returns = [];
+      state.returns.push({
+        id: Date.now(),
+        delegateId: state.currentUser.id,
+        delegateName: state.currentUser.name,
+        customerId: cust.id,
+        customerName: `${cust.name} (${cust.storeName || 'بدون محل'})`,
+        productName: productName,
+        quantity: qty,
+        reason: reason,
+        time: now.toLocaleTimeString('ar-IQ'),
+        rawDate: now.toISOString().slice(0,10)
+      });
+      const prod = state.products.find(p => p.name === productName);
+      if (prod && reason === 'زيادة في الطلب / ترجيع سليم') prod.totalStock += qty;
+      saveData();
+      alert("تم تسجيل المرتجع بنجاح.");
+      document.getElementById('returnQty').value = '1';
+    }
+
+    function createReceiptVoucher(e) {
+      e.preventDefault();
+      const custId = document.getElementById('receiptCustomerSelect').value;
+      const amount = parseFloat(document.getElementById('receiptAmount').value) || 0;
+      const notes = document.getElementById('receiptNotes').value.trim();
+      if(!custId || amount <= 0) return alert("الرجاء اختيار الزبون وإدخال مبلغ صحيح.");
+      const cust = state.customers.find(c => c.id == custId);
+      const now = new Date();
+      const receiptObj = {
+        id: Date.now(),
+        issuerId: state.currentUser.id,
+        issuerRole: state.currentUser.role,
+        customerId: cust.id,
+        customerName: `${cust.name} (${cust.storeName || 'بدون محل'})`,
+        customerPhone: cust.phone,
+        amount: amount,
+        notes: notes,
+        delegateName: state.currentUser.name,
+        date: now.toLocaleString('ar-IQ'),
+        rawDate: now.toISOString().slice(0,10)
+      };
+      if(!state.receipts) state.receipts = [];
+      state.receipts.push(receiptObj);
+      pushNotification('admin', `سند قبض جديد #${receiptObj.id}`, `تم إصدار سند قبض بقيمة ${amount.toLocaleString()} د.ع بواسطة المندوب: ${state.currentUser.name}`);
+      saveData();
+      document.getElementById('receiptAmount').value = '';
+      document.getElementById('receiptNotes').value = '';
+      openReceiptModal(receiptObj.id);
+      renderDelegateView();
+    }
+
+    function createDriverReceiptVoucher(e) {
+      e.preventDefault();
+      const custId = document.getElementById('driverReceiptCustomerSelect').value;
+      const amount = parseFloat(document.getElementById('driverReceiptAmount').value) || 0;
+      const notes = document.getElementById('driverReceiptNotes').value.trim();
+      if(!custId || amount <= 0) return alert("الرجاء اختيار الزبون وإدخال مبلغ صحيح.");
+      const cust = state.customers.find(c => c.id == custId);
+      const now = new Date();
+      const receiptObj = {
+        id: Date.now(),
+        issuerId: state.currentUser.id,
+        issuerRole: state.currentUser.role,
+        customerId: cust.id,
+        customerName: `${cust.name} (${cust.storeName || 'بدون محل'})`,
+        customerPhone: cust.phone,
+        amount: amount,
+        notes: notes,
+        delegateName: state.currentUser.name,
+        date: now.toLocaleString('ar-IQ'),
+        rawDate: now.toISOString().slice(0,10)
+      };
+      if(!state.receipts) state.receipts = [];
+      state.receipts.push(receiptObj);
+      pushNotification('admin', `سند قبض سائق #${receiptObj.id}`, `تم إصدار سند قبض بقيمة ${amount.toLocaleString()} د.ع بواسطة السائق: ${state.currentUser.name}`);
+      saveData();
+      document.getElementById('driverReceiptAmount').value = '';
+      document.getElementById('driverReceiptNotes').value = '';
+      openReceiptModal(receiptObj.id);
+      renderDriverView();
+    }
+
+    function openReceiptModal(recId) {
+      window.currentReceiptId = recId;
+      const r = state.receipts.find(x => x.id === recId);
+      document.getElementById('recCompanyName').innerText = "شركة " + state.company.companyName;
+      document.getElementById('recId').innerText = r.id;
+      document.getElementById('recDate').innerText = r.date;
+      document.getElementById('recCustomerName').innerText = r.customerName;
+      document.getElementById('recAmount').innerText = r.amount.toLocaleString();
+      document.getElementById('recDelegateName').innerText = `${r.delegateName} (${r.issuerRole === 'driver' ? 'سائق' : 'مندوب'})`;
+      document.getElementById('recNotes').innerText = r.notes || 'لا توجد ملاحظات';
+      document.getElementById('receiptModal').classList.remove('hidden');
+    }
+
+    function closeReceiptModal() {
+      document.getElementById('receiptModal').classList.add('hidden');
+    }
+
+    function changeReceiptSize(sizeClass) {
+      document.getElementById('receiptPaperContainer').className = "invoice-paper " + sizeClass;
+    }
+
+    function printReceiptThermal() {
+      document.getElementById('receiptSizeSelector').value = 'size-pos';
+      changeReceiptSize('size-pos');
+      window.print();
+    }
+
+    function sendReceiptWhatsApp() {
+      const r = state.receipts.find(x => x.id === window.currentReceiptId);
+      if(!r) return;
+      const formattedPhone = formatIraqiPhoneForWhatsApp(r.customerPhone);
+      const text = `🧾 *سند قبض نقدي - شركة ${state.company.companyName}*\n📄 رقم السند: #${r.id}\n👤 العميل: ${r.customerName}\n💵 المبلغ المستلم: *${r.amount.toLocaleString()} د.ع*\n📝 ملاحظات: ${r.notes}\n👨‍💼 المستلم: ${r.delegateName}\n📅 التاريخ: ${r.date}\n\n_${state.company.invoiceSlogan}_`;
+      window.open(formattedPhone ? `https://api.whatsapp.com/send?phone=${formattedPhone}&text=${encodeURIComponent(text)}` : `https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, '_blank');
+    }
+
+    function sendReceiptWhatsAppToManager() {
+      const r = state.receipts.find(x => x.id === window.currentReceiptId);
+      if(!r) return;
+      const managerPhoneFormatted = formatIraqiPhoneForWhatsApp(state.company.phone);
+      const text = `👨‍💼 *إشعار سند قبض للمدير - شركة ${state.company.companyName}*\n📄 رقم السند: #${r.id}\n👤 العميل: ${r.customerName}\n💵 المبلغ المستلم: *${r.amount.toLocaleString()} د.ع*\n📝 ملاحظات: ${r.notes}\n👨‍💼 المستلم: ${r.delegateName}\n📅 التاريخ: ${r.date}`;
+      window.open(managerPhoneFormatted ? `https://api.whatsapp.com/send?phone=${managerPhoneFormatted}&text=${encodeURIComponent(text)}` : `https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, '_blank');
+    }
+
+    function sendDebtAlertToManager(orderId) {
+      const o = state.orders.find(x => x.id === orderId);
+      if(!o) return;
+      const managerPhoneFormatted = formatIraqiPhoneForWhatsApp(state.company.phone);
+      let payDesc = o.paymentType === 'credit' ? 'آجل بالكامل' : `دفع جزئي (واصل: ${(o.paidAmount||0).toLocaleString()} د.ع)`;
+      const text = `🚨 *طلب موافقة فاتورة آجل جديدة - شركة ${state.company.companyName}*\n📄 رقم الفاتورة: #${o.id}\n👨‍💼 المندوب القاطع: ${o.delegateName} (${o.delegatePhone})\n👤 الزبون والمحل: ${o.customerName}\n💰 المبلغ الإجمالي: *${o.totalPrice.toLocaleString()} د.ع*\n💳 نوع الدفع: ${payDesc}\n------------------\nيرجى مراجعة لوحة التحكم لاعتماد الفاتورة أو رفضها.`;
+      window.open(managerPhoneFormatted ? `https://api.whatsapp.com/send?phone=${managerPhoneFormatted}&text=${encodeURIComponent(text)}` : `https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, '_blank');
+    }
+
+    function openCustomerStatementModal() {
+      const custId = document.getElementById('statementCustomerSelect').value;
+      if(!custId) return alert("اختر الزبون أولاً.");
+      const cust = state.customers.find(c => c.id == custId);
+      const custOrders = state.orders.filter(o => o.customerId == custId);
+      document.getElementById('stmtCompanyName').innerText = "شركة " + state.company.companyName;
+      document.getElementById('stmtCustomerTitle').innerText = `كشف حساب العميل: ${cust.name} - محل: (${cust.storeName || 'بدون'})`;
+      document.getElementById('stmtCustPhone').innerText = cust.phone;
+      document.getElementById('stmtCustAddress').innerText = cust.address;
+
+      let sumSales = 0, sumPaid = 0, sumDebt = 0, rowsHtml = '';
+      if (custOrders.length === 0) rowsHtml = `<tr><td colspan="6" style="text-align:center;">لا توجد فواتير مسجلة لهذا العميل.</td></tr>`;
+      else {
+        custOrders.forEach(o => {
+          sumSales += o.totalPrice;
+          let paidSoFar = (o.paidAmount || 0) + (o.partialPaidHistory ? o.partialPaidHistory.reduce((s,x)=>s+x.amount,0) : 0);
+          if (o.paymentType === 'cash' && o.status === 'تم التسليم') paidSoFar = o.totalPrice;
+          sumPaid += paidSoFar;
+          let rem = (o.paymentType === 'credit' || o.paymentType === 'partial') ? (o.totalPrice - paidSoFar) : 0;
+          if(rem > 0) sumDebt += rem;
+          rowsHtml += `<tr><td>#${o.id}</td><td>${o.date}</td><td>${o.totalPrice.toLocaleString()} د.ع</td><td>${o.paymentType}</td><td><strong style="color:${rem>0?'#b45309':'#16a34a'}">${rem.toLocaleString()} د.ع</strong></td><td>${o.status}</td></tr>`;
+        });
+      }
+      document.getElementById('stmtOrdersTableBody').innerHTML = rowsHtml;
+      document.getElementById('stmtSumSales').innerText = sumSales.toLocaleString();
+      document.getElementById('stmtSumPaid').innerText = sumPaid.toLocaleString();
+      document.getElementById('stmtSumDebt').innerText = sumDebt.toLocaleString();
+      document.getElementById('customerStatementModal').classList.remove('hidden');
+    }
+
+    function closeCustomerStatementModal() {
+      document.getElementById('customerStatementModal').classList.add('hidden');
+    }
+
+    function sendCustomerStatementWhatsApp() {
+      const custId = document.getElementById('statementCustomerSelect').value;
+      if(!custId) return alert("اختر الزبون أولاً.");
+      const cust = state.customers.find(c => c.id == custId);
+      const custOrders = state.orders.filter(o => o.customerId == custId);
+      let sumSales = 0, sumDebt = 0;
+      custOrders.forEach(o => {
+        sumSales += o.totalPrice;
+        let paidSoFar = (o.paidAmount || 0) + (o.partialPaidHistory ? o.partialPaidHistory.reduce((s,x)=>s+x.amount,0) : 0);
+        if (o.paymentType === 'cash' && o.status === 'تم التسليم') paidSoFar = o.totalPrice;
+        let rem = (o.paymentType === 'credit' || o.paymentType === 'partial') ? (o.totalPrice - paidSoFar) : 0;
+        if(rem > 0) sumDebt += rem;
+      });
+      const text = `📊 *كشف حساب عميل - شركة ${state.company.companyName}*\n👤 العميل: ${cust.name} (${cust.storeName || ''})\n📞 الهاتف: ${cust.phone}\n------------------\n🛍️ إجمالي المشتريات: ${sumSales.toLocaleString()} د.ع\n💰 إجمالي الديون المترتبة (الآجل): *${sumDebt.toLocaleString()} د.ع*\n------------------\nيرجى تسوية الحسابات في أقرب وقت.\n_${state.company.invoiceSlogan}_`;
+      window.open(`https://api.whatsapp.com/send?phone=${formatIraqiPhoneForWhatsApp(cust.phone)}&text=${encodeURIComponent(text)}`, '_blank');
+    }
+
+    function createInvoice(e) {
+      e.preventDefault();
+      if (currentCartItems.length === 0) return alert("السلة فارغة.");
+      const cid = document.getElementById('invoiceCustomerSelect').value;
+      if (!cid) return alert("اختر الزبون.");
+
+      const customer = state.customers.find(c => c.id == cid);
+      const paymentType = document.getElementById('invoicePaymentType').value;
+      let paidAmount = paymentType === 'partial' ? (parseFloat(document.getElementById('invoicePaidAmount').value) || 0) : 0;
+      const notes = document.getElementById('invoiceNotes').value.trim();
+
+      let orderTotal = 0, orderCommission = 0;
+      currentCartItems.forEach(item => {
+        orderTotal += item.totalPrice;
+        orderCommission += item.totalCommission;
+        const prod = state.products.find(p => p.id === item.productId);
+        if (prod) {
+          prod.totalStock = Math.max(0, prod.totalStock - item.quantity);
+          const flav = (prod.flavors || []).find(f => f.name === item.flavor);
+          if (flav) flav.stock = Math.max(0, flav.stock - item.quantity);
+        }
+      });
+
+      const needsApproval = paymentType === 'credit' || paymentType === 'partial';
+      const now = new Date();
+      const order = {
+        id: Date.now(),
+        customerId: customer.id,
+        customerStoreName: customer.storeName || '',
+        customerName: `${customer.name} - محل: ${customer.storeName || 'بدون'}`,
+        customerPhone: customer.phone,
+        customerAddress: customer.address,
+        customerGps: customer.gps,
+        delegateId: state.currentUser.id,
+        delegateName: state.currentUser.name,
+        delegatePhone: state.currentUser.phone,
+        driverId: null,
+        items: [...currentCartItems],
+        totalPrice: orderTotal,
+        delegateCommission: orderCommission,
+        paymentType: paymentType,
+        paidAmount: paymentType === 'cash' ? orderTotal : paidAmount,
+        notes: notes,
+        approvalStatus: needsApproval ? 'قيد الموافقة' : 'معتمد',
+        status: 'جديد',
+        date: now.toLocaleDateString('ar-IQ'),
+        rawDate: now.toISOString().slice(0,10),
+        commissionCleared: false
+      };
+
+      state.orders.push(order);
+      pushNotification('admin', `فاتورة جديدة #${order.id}`, `فاتورة جديدة بقيمة ${orderTotal.toLocaleString()} د.ع مرسلة من المندوب: ${order.delegateName}`);
+      shareOrderWhatsAppAdvanced(order.id);
+
+      if (needsApproval) {
+        setTimeout(() => {
+          if (confirm("🚨 تم قطع فاتورة آجل/جزئي جديدة.\nهل تريد إرسال إشعار واتساب الفوري إلى المدير الآن للموافقة؟")) {
+            sendDebtAlertToManager(order.id);
+          }
+        }, 500);
+      }
+
+      currentCartItems = [];
+      localStorage.removeItem('app_current_cart');
+      document.getElementById('invoiceNotes').value = '';
+      saveData();
+      renderDelegateView();
+    }
+
+    function renderDriverView() {
+      const driverFilterDate = document.getElementById('driverFilterDate').value;
+      const driverReceiptsContainer = document.getElementById('driverReceiptsListContainer');
+      let myReceipts = state.receipts.filter(r => r.issuerId === state.currentUser.id);
+      if (driverFilterDate) myReceipts = myReceipts.filter(r => r.rawDate === driverFilterDate);
+      renderReceiptCustomerDropdown();
+
+      driverReceiptsContainer.innerHTML = myReceipts.length === 0 ? `<p style="color:#64748b;">لا توجد سندات قبض صادرة منك.</p>` :
+        `<table class="data-table"><thead><tr><th>رقم السند</th><th>الزبون</th><th>المبلغ</th><th>التاريخ</th><th>إجراء</th></tr></thead><tbody>` +
+        myReceipts.slice().reverse().map(r => `<tr><td>#${r.id}</td><td>${r.customerName} ${customerMapButton(r.customerId)}</td><td style="color:#16a34a; font-weight:bold;">${r.amount.toLocaleString()} د.ع</td><td>${r.date}</td><td><button class="btn-secondary" style="padding:4px 8px; font-size:0.75rem;" onclick="openReceiptModal(${r.id})">فتح السند</button></td></tr>`).join('') + `</tbody></table>`;
+
+      let myOrders = state.orders.filter(o => o.driverId === state.currentUser.id);
+      let countReceived = myOrders.length;
+      let countDelivered = myOrders.filter(o => o.status === 'تم التسليم').length;
+      let countReturned = myOrders.filter(o => o.status === 'تعذر التسليم').length;
+      let totalCollected = 0;
+      let cashOrdersSum = 0;
+      let receiptsSum = 0;
+
+      myOrders.forEach(o => {
+        if(o.status === 'تم التسليم') {
+          if(o.paymentType === 'cash') {
+            totalCollected += o.totalPrice;
+            cashOrdersSum += o.totalPrice;
+          } else if(o.paymentType === 'partial') {
+            let pVal = (o.paidAmount || 0);
+            totalCollected += pVal;
+            cashOrdersSum += pVal;
+          }
+        }
+      });
+
+      myReceipts.forEach(r => { receiptsSum += r.amount; });
+      let grandTotalBoxSum = cashOrdersSum + receiptsSum;
+
+      document.getElementById('drvCalcCashOrders').innerText = cashOrdersSum.toLocaleString() + " د.ع";
+      document.getElementById('drvCalcReceipts').innerText = receiptsSum.toLocaleString() + " د.ع";
+      document.getElementById('drvCalcTotalBox').innerText = grandTotalBoxSum.toLocaleString() + " د.ع";
+
+      let filteredOrdersForReport = driverFilterDate ? myOrders.filter(o => o.rawDate === driverFilterDate) : [...myOrders];
+      let deliveredReportList = filteredOrdersForReport.filter(o => o.status === 'تم التسليم');
+      let rejectedReportList = filteredOrdersForReport.filter(o => o.status === 'تعذر التسليم');
+      let repTotalCollected = deliveredReportList.reduce((sum, o) => sum + (o.paymentType === 'cash' ? o.totalPrice : (o.paymentType === 'partial' ? (o.paidAmount || 0) : 0)), 0);
+
+      document.getElementById('driverReportSummaryBox').innerHTML = `📊 ملخص تقرير السائق: إجمالي المسند = <strong>${filteredOrdersForReport.length}</strong> | تم إيصالها = <strong style="color:#16a34a;">${deliveredReportList.length}</strong> | تم رفضها = <strong style="color:#ef4444;">${rejectedReportList.length}</strong> | النقد المحصل = <strong style="color:#0284c7;">${repTotalCollected.toLocaleString()} د.ع</strong>`;
+
+      document.getElementById('driverDeliveredOrdersReportContainer').innerHTML = deliveredReportList.length === 0 ? `<p style="color:#64748b; font-size:0.85rem;">لا توجد فواتير واصلة.</p>` :
+        `<table class="data-table"><thead><tr><th>رقم الفاتورة</th><th>الزبون</th><th>المندوب القاطع</th><th>المبلغ</th><th>الدفع</th></tr></thead><tbody>` + deliveredReportList.map(o => `<tr><td>#${o.id}</td><td>${o.customerName} ${customerMapButton(o.customerId)}</td><td>${o.delegateName}</td><td>${o.totalPrice.toLocaleString()} د.ع</td><td>${o.paymentType}</td></tr>`).join('') + `</tbody></table>`;
+
+      document.getElementById('driverRejectedOrdersReportContainer').innerHTML = rejectedReportList.length === 0 ? `<p style="color:#64748b; font-size:0.85rem;">لا توجد فواتير مرفوضة.</p>` :
+        `<table class="data-table"><thead><tr><th>رقم الفاتورة</th><th>الزبون</th><th>المندوب القاطع</th><th>المبلغ</th><th>سبب الرفض</th></tr></thead><tbody>` + rejectedReportList.map(o => `<tr><td>#${o.id}</td><td>${o.customerName} ${customerMapButton(o.customerId)}</td><td>${o.delegateName}</td><td>${o.totalPrice.toLocaleString()} د.ع</td><td style="color:#dc2626; font-weight:bold;">${o.rejectReason || 'بدون سبب محدد'}</td></tr>`).join('') + `</tbody></table>`;
+
+      document.getElementById('driverReportReceiptsContainer').innerHTML = myReceipts.length === 0 ? `<p style="color:#64748b; font-size:0.85rem;">لا توجد سندات قبض.</p>` :
+        `<table class="data-table"><thead><tr><th>رقم السند</th><th>الزبون</th><th>المبلغ المستلم</th><th>التاريخ</th></tr></thead><tbody>` + myReceipts.slice().reverse().map(r => `<tr><td>#${r.id}</td><td>${r.customerName} ${customerMapButton(r.customerId)}</td><td style="color:#16a34a; font-weight:bold;">${r.amount.toLocaleString()} د.ع</td><td>${r.date}</td></tr>`).join('') + `</tbody></table>`;
+
+      document.getElementById('driverReceivedCount').innerText = countReceived;
+      document.getElementById('driverDeliveredCount').innerText = countDelivered;
+      document.getElementById('driverReturnedCount').innerText = countReturned;
+      document.getElementById('driverTotalCollectedAmount').innerText = totalCollected.toLocaleString() + " د.ع";
+
+      // عرض الطلبات المسندة للسائق مع اسم المندوب القاطع (المرسل) بوضوح وحقل اختيار سبب الرفض الإجباري
+      const container = document.getElementById('driverOrdersContainer');
+      container.innerHTML = myOrders.length === 0 ? '<p>لا توجد طلبات توصيل مسندة إليك.</p>' : '';
+      myOrders.forEach(o => {
+        let proofImgHtml = o.proofImage ? `<img src="${o.proofImage}" style="max-width:100px; max-height:100px; border-radius:6px; margin-top:5px;">` : `<span style="color:#64748b; font-size:0.80rem;">لم يتم إرفاق صورة</span>`;
+        let isRejected = o.status === 'تعذر التسليم';
+        let rejectBoxDisplay = isRejected ? 'block' : 'none';
+        
+        container.innerHTML += `<div class="order-card" style="border-right: 4px solid #16a34a;">
+          <h4>فاتورة #${o.id} - الزبون: ${o.customerName}</h4>
+          <div style="margin: 8px 0; background: #e0f2fe; padding: 6px 10px; border-radius: 6px; border: 1px solid #0284c7;">
+            <p style="color: #0369a1; font-weight: bold; font-size: 0.95rem;">👨‍💼 المندوب القاطع (المرسل): <span style="color: #0f172a; text-decoration: underline;">${o.delegateName}</span> (هاتف: ${o.delegatePhone || 'غير متوفر'})</p>
+          </div>
+          <p><strong>هاتف الزبون:</strong> ${o.customerPhone || 'غير مسجل'}</p>
+          <p><strong>العنوان:</strong> ${o.customerAddress}</p>
+          <p><strong>المبلغ الكلي:</strong> ${o.totalPrice.toLocaleString()} د.ع (${o.paymentType})</p>
+          <div style="margin: 10px 0; display:flex; gap:10px; flex-wrap:wrap;">
+            <button class="btn-primary" style="background:#8b5cf6;" onclick="openInvoicePrint(${o.id})">📄 فتح الفاتورة وتفاصيل المواد</button>
+            <a href="https://maps.google.com/?q=${o.customerGps}" target="_blank" class="btn-primary" style="text-decoration:none; display:inline-block;">🗺️ فتح موقع GPS</a>
+          </div>
+          <div style="margin:8px 0;">
+            <label style="font-size:0.85rem;">📸 رفع صورة الإثبات أو الوصل:</label>
+            <input type="file" accept="image/*" onchange="uploadDriverProofImage(${o.id}, this)">
+            <div>${proofImgHtml}</div>
+          </div>
+          <div>
+            <label>حالة التوصيل:</label>
+            <select id="statusSelect_${o.id}" onchange="handleDriverStatusChange(${o.id}, this.value)">
+              <option value="قيد التجهيز" ${o.status==='قيد التجهيز'?'selected':''}>قيد التجهيز</option>
+              <option value="تم التسليم" ${o.status==='تم التسليم'?'selected':''}>تم التسليم (إيصال ناجح ✅)</option>
+              <option value="تعذر التسليم" ${o.status==='تعذر التسليم'?'selected':''}>تعذر التسليم / رفض الزبون ❌</option>
+            </select>
+          </div>
+          
+          <div id="rejectReasonBox_${o.id}" style="margin-top:10px; display:${rejectBoxDisplay}; background:#fef2f2; padding:10px; border-radius:6px; border:1px solid #ef4444;">
+            <label style="color:#dc2626; font-size:0.85rem;">⚠️ سبب الرفض أو تعذر التسليم (إجباري):</label>
+            <select id="rejectReasonSelect_${o.id}" style="margin-top:4px;">
+              <option value="">اختر السبب...</option>
+              <option value="المحل مغلق" ${o.rejectReason==='المحل مغلق'?'selected':''}>المحل مغلق</option>
+              <option value="الزبون غير موجود" ${o.rejectReason==='الزبون غير موجود'?'selected':''}>الزبون غير موجود</option>
+              <option value="رفض استلام البضاعة" ${o.rejectReason==='رفض استلام البضاعة'?'selected':''}>رفض استلام البضاعة</option>
+              <option value="تأخر في التوصيل" ${o.rejectReason==='تأخر في التوصيل'?'selected':''}>تأخر في التوصيل</option>
+            </select>
+            <button class="btn-danger" style="margin-top:8px; padding:6px 12px; font-size:0.85rem;" onclick="saveDriverRejectReason(${o.id})">💾 حفظ سبب الرفض وإرسال للتقرير</button>
+          </div>
+        </div>`;
+      });
+    }
+
+    function handleDriverStatusChange(orderId, statusVal) {
+      const rejectBox = document.getElementById(`rejectReasonBox_${orderId}`);
+      if (statusVal === 'تعذر التسليم') {
+        rejectBox.style.display = 'block';
+      } else {
+        rejectBox.style.display = 'none';
+        updateOrderStatusDirect(orderId, statusVal, "");
+      }
+    }
+
+    function saveDriverRejectReason(orderId) {
+      const reasonVal = document.getElementById(`rejectReasonSelect_${orderId}`).value;
+      if (!reasonVal) return alert("الرجاء اختيار سبب الرفض أولاً.");
+      updateOrderStatusDirect(orderId, 'تعذر التسليم', reasonVal);
+    }
+
+    function updateOrderStatusDirect(orderId, status, rejectReason) {
+      const order = state.orders.find(o => o.id === orderId);
+      order.status = status;
+      if (status === 'تم التسليم') { const now = new Date(); order.deliveredAt = now.toISOString(); order.deliveredAtRawDate = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`; }
+      if (rejectReason !== undefined) order.rejectReason = rejectReason;
+      pushNotification('delegate', `تحديث الطلب #${orderId}`, `تغيرت حالة الطلب إلى: ${status} ${rejectReason ? '('+rejectReason+')' : ''}`);
+      saveData();
+      alert("تم تحديث وحفظ حالة الطلب بنجاح.");
+      renderDriverView();
+    }
+
+    function uploadDriverProofImage(orderId, inputElem) {
+      if(inputElem.files && inputElem.files[0]) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          const img = new Image();
+          img.onload = function() {
+            const canvas = document.createElement('canvas');
+            const maxDim = 700;
+            const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+            canvas.width = Math.max(1, Math.round(img.width * scale));
+            canvas.height = Math.max(1, Math.round(img.height * scale));
+            canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+            const order = state.orders.find(o => o.id === orderId);
+            if (!order) return alert('لم يتم العثور على الطلب.');
+            order.proofImage = canvas.toDataURL('image/jpeg', 0.60);
+            saveData();
+            alert("تم رفع الصورة وإرفاقها.");
+            renderDriverView();
+          };
+          img.onerror = function() { alert('تعذر قراءة صورة إثبات التسليم.'); };
+          img.src = e.target.result;
+        };
+        reader.readAsDataURL(inputElem.files[0]);
+      }
+    }
+
+    function performGlobalSearch() {
+      const q = document.getElementById('globalSearchInput').value.trim().toLowerCase();
+      const container = document.getElementById('searchResultsContainer');
+      if(!q) { container.innerHTML = ''; return; }
+      const res = state.orders.filter(o => o.id.toString().includes(q) || o.customerName.toLowerCase().includes(q) || o.delegateName.toLowerCase().includes(q));
+      container.innerHTML = res.map(o => `<p>📄 فاتورة #${o.id} للزبون ${o.customerName} (المندوب القاطع: <strong>${o.delegateName}</strong>) <button class="btn-secondary" style="padding:2px 6px; font-size:0.75rem;" onclick="openInvoicePrint(${o.id})">فتح</button></p>`).join('') || '<p>لا توجد نتائج.</p>';
+    }
+
+    function downloadInvoicePDF() {
+      const element = document.getElementById('invoicePaperContainer');
+      exportElementToPDF(element, `Invoice_${window.currentPrintOrderId || 'file'}.pdf`);
+    }
+
+    function printThermalBluetooth() {
+      document.getElementById('invoiceSizeSelector').value = 'size-pos';
+      changeInvoiceSize('size-pos');
+      window.print();
+    }
+
+    function formatIraqiPhoneForWhatsApp(rawPhone) {
+      if (!rawPhone) return "";
+      let digits = rawPhone.replace(/\D/g, '');
+      if (digits.startsWith('00964')) return digits.substring(2);
+      if (digits.startsWith('964')) return digits;
+      if (digits.startsWith('0')) return '964' + digits.substring(1);
+      if (digits.startsWith('7')) return '964' + digits;
+      return digits;
+    }
+
+    function shareOrderWhatsAppAdvanced(orderId) {
+      const o = state.orders.find(x => x.id === orderId);
+      if (!o) return;
+      let rawPhone = o.customerPhone;
+      if (!rawPhone) {
+        const custObj = state.customers.find(c => c.name === o.customerName);
+        if (custObj) rawPhone = custObj.phone;
+      }
+      const formattedPhone = formatIraqiPhoneForWhatsApp(rawPhone);
+      const itemsListText = (o.items || []).map(i => `▪ ${i.productName} (${i.flavor}): ${i.quantity} × ${i.unitPrice.toLocaleString()} = ${i.totalPrice.toLocaleString()} د.ع`).join('\n');
+      const text = `📦 *فاتورة شركة ${state.company.companyName}*\n📄 رقم الفاتورة: #${o.id}\n👤 الزبون: ${o.customerName}\n📍 العنوان: ${o.customerAddress}\n------------------\n${itemsListText}\n------------------\n💰 *المبلغ الإجمالي: ${o.totalPrice.toLocaleString()} د.ع*\n👨‍💼 المندوب القاطع: ${o.delegateName} (${o.delegatePhone})\n📞 هاتف الشكاوي: ${state.company.complaintsPhone}\n${o.customerGps ? `🗺️ موقع الزبون GPS: https://maps.google.com/?q=${o.customerGps}\n` : ''}\n_${state.company.invoiceSlogan}_`;
+      window.open(formattedPhone ? `https://api.whatsapp.com/send?phone=${formattedPhone}&text=${encodeURIComponent(text)}` : `https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, '_blank');
+    }
+
+    function changeInvoiceSize(sizeClass) {
+      document.getElementById('invoicePaperContainer').className = "invoice-paper " + sizeClass;
+    }
+
+    function openInvoicePrint(orderId) {
+      window.currentPrintOrderId = orderId;
+      const o = state.orders.find(x => x.id === orderId);
+      document.getElementById('invCompanyName').innerText = state.company.companyName;
+      document.getElementById('invManagerName').innerText = state.company.managerName;
+      document.getElementById('invManagerPhone').innerText = state.company.phone;
+      document.getElementById('invFooterCustomSlogan').innerText = state.company.invoiceSlogan;
+      if(state.company.logoUrl) document.getElementById('invLogo').src = state.company.logoUrl;
+
+      document.getElementById('invId').innerText = o.id;
+      document.getElementById('invCustomer').innerText = o.customerName;
+      document.getElementById('invCustomerPhone').innerText = o.customerPhone || 'غير مسجل';
+      document.getElementById('invAddress').innerText = o.customerAddress;
+      document.getElementById('invDelegateName').innerText = o.delegateName;
+      document.getElementById('invDelegatePhone').innerText = o.delegatePhone;
+      document.getElementById('invDate').innerText = o.date;
+      document.getElementById('invComplaintsPhone').innerText = state.company.complaintsPhone;
+      document.getElementById('invPaymentTypeBadge').innerText = o.paymentType;
+
+      const notesBox = document.getElementById('invNotesBox');
+      if (o.notes) {
+        document.getElementById('invNotesText').innerText = o.notes;
+        notesBox.style.display = 'block';
+      } else {
+        notesBox.style.display = 'none';
+      }
+
+      document.getElementById('invItemsBody').innerHTML = (o.items || []).map(i => `<tr><td>${i.productName} (${i.flavor})</td><td>${i.quantity}</td><td>${i.unitPrice.toLocaleString()} د.ع</td><td>${i.totalPrice.toLocaleString()} د.ع</td></tr>`).join('');
+      document.getElementById('invFinalTotal').innerText = o.totalPrice.toLocaleString();
+      
+      const qrTarget = o.customerGps ? `https://maps.google.com/?q=${o.customerGps}` : `Invoice #${o.id} - ${o.customerName}`;
+      QRCode.toCanvas(document.getElementById('invoiceQrCanvas'), qrTarget, { width: 100, margin: 1 });
+      document.getElementById('printInvoiceModal').classList.remove('hidden');
+    }
+
+    function closeInvoiceModal() {
+      document.getElementById('printInvoiceModal').classList.add('hidden');
+    }
+
+    function logActivity(text) {
+      state.activities.unshift({ time: new Date().toLocaleTimeString('ar-IQ'), text: text });
+    }
+
+    // أدوات تكبير وتصغير مستقلة عن اختيار نوع الحساب.
+    let systemZoomLevel = 1;
+    function applySystemZoom() {
+      document.documentElement.style.zoom = String(systemZoomLevel);
+      const label = document.getElementById('systemZoomLabel');
+      if (label) label.textContent = `${Math.round(systemZoomLevel * 100)}%`;
+      try { localStorage.setItem('salesSystemZoom', String(systemZoomLevel)); } catch (_) {}
+    }
+    function changeSystemZoom(delta) {
+      systemZoomLevel = Math.min(1.3, Math.max(0.8, Math.round((systemZoomLevel + delta) * 10) / 10));
+      applySystemZoom();
+    }
+    function resetSystemZoom() { systemZoomLevel = 1; applySystemZoom(); }
+    try {
+      const savedZoom = Number(localStorage.getItem('salesSystemZoom'));
+      if (Number.isFinite(savedZoom) && savedZoom >= 0.8 && savedZoom <= 1.3) systemZoomLevel = savedZoom;
+    } catch (_) {}
+
+    // مستمع احتياطي مباشر لأزرار اختيار الدور؛ يضمن الاستجابة للمس على الهاتف.
+    document.addEventListener('click', function(event) {
+      const button = event.target && event.target.closest ? event.target.closest('.role-selector .btn-role') : null;
+      if (!button) return;
+      const role = button.dataset.role || (button.getAttribute('onclick') || '').match(/switchRoleTab\('([^']+)'/)?.[1];
+      if (role) switchRoleTab(role, button);
+    }, true);
+
+    window.onload = function() {
+      applySystemZoom();
+      applySystemBranding();
+      updateCloudSyncBadge('🔒 جارٍ التحقق من جلسة الدخول…', '#94a3b8');
+      if (auth && typeof auth.onAuthStateChanged === 'function') {
+        auth.onAuthStateChanged(firebaseUser => {
+          if (manualLoginInProgress) return;
+          if (firebaseUser) restoreFirebaseSession(firebaseUser);
+          else if (!state.currentUser) {
+            document.getElementById('appScreen').classList.add('hidden');
+            document.getElementById('authScreen').classList.remove('hidden');
+            updateCloudSyncBadge('🔒 سجّل الدخول بحساب Firebase للاتصال بالبيانات', '#94a3b8');
+          }
+        });
+      } else {
+        updateCloudSyncBadge('🔒 سجّل الدخول بحساب Firebase للاتصال بالبيانات', '#94a3b8');
+      }
+    };
+  </script>
+</body>
+</html>
