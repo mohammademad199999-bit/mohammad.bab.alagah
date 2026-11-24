@@ -4053,7 +4053,7 @@ try {
   overflow:visible!important;
 }
 .mobile-swipe-hint{
-  display:none;
+  display:block;
   direction:rtl;
   text-align:center;
   padding:7px 8px;
@@ -4063,7 +4063,6 @@ try {
   border-bottom:1px solid #e2e8f0;
 }
 @media(max-width:768px){
-  .mobile-swipe-hint{display:block}
   .mobile-horizontal-scroll,.table-swipe-wrap,
   #delegateReportOrdersContainer,#delegateReportReceiptsContainer,#delegateDebtOrdersContainer{
     border:1px solid #dbe3ef;
@@ -4882,19 +4881,51 @@ html,body,#app,.app-shell,.main-content,.view-section,.card,
 
     function openCustomerMap(customerId) {
       const customer = getCustomerById(customerId);
-      if (!customer || !customer.gps) return alert('لا توجد إحداثيات GPS محفوظة لهذا العميل.');
+      if (!customer) return alert('تعذر العثور على بيانات هذا الزبون.');
+      if (!customer.gps) {
+        return requestCustomerLocation(customerId);
+      }
       const parts = String(customer.gps).split(',').map(value => Number(value.trim()));
-      if (parts.length !== 2 || !Number.isFinite(parts[0]) || !Number.isFinite(parts[1])) {
-        return alert('إحداثيات موقع العميل غير صالحة.');
+      if (parts.length !== 2 || !Number.isFinite(parts[0]) || !Number.isFinite(parts[1]) ||
+          Math.abs(parts[0]) > 90 || Math.abs(parts[1]) > 180) {
+        return alert('إحداثيات موقع الزبون غير صالحة. يرجى تحديد الموقع من جديد.');
       }
       const url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(parts[0] + ',' + parts[1])}`;
-      window.open(url, '_blank', 'noopener');
+      const opened = window.open(url, '_blank', 'noopener,noreferrer');
+      if (!opened) window.location.href = url;
+    }
+
+    // عند عدم وجود موقع محفوظ، يطلب المتصفح إذن GPS صراحةً ثم يحفظ إحداثيات الزبون.
+    function requestCustomerLocation(customerId) {
+      const customer = getCustomerById(customerId);
+      if (!customer) return alert('تعذر العثور على بيانات هذا الزبون.');
+      if (!navigator.geolocation) return alert('المتصفح لا يدعم تحديد الموقع. افتح النظام عبر HTTPS أو متصفح حديث.');
+      if (!confirm('هل أنت واقف عند محل الزبون وتريد حفظ موقعك الحالي لهذا الزبون؟ سيطلب المتصفح إذن الوصول إلى الموقع.')) return;
+      navigator.geolocation.getCurrentPosition(async position => {
+        customer.gps = `${position.coords.latitude},${position.coords.longitude}`;
+        customer.gpsUpdatedAt = new Date().toISOString();
+        try {
+          await saveData();
+          alert('تم حفظ موقع الزبون بنجاح. سيتم فتحه في خرائط Google.');
+          openCustomerMap(customerId);
+          const mapButton = document.querySelector('#customerQuickProfileOverlay .customer-quick-map-inline');
+          if (mapButton) mapButton.innerHTML = `📍 ${customerLedgerEscape(customer.storeName || customer.name || 'فتح الموقع')}`;
+        } catch (error) {
+          console.error(error);
+          alert('تم تحديد الموقع لكن تعذر تأكيد مزامنته. تحقق من اتصال النظام.');
+        }
+      }, error => {
+        const message = error.code === 1 ? 'رفضت إذن الموقع. اسمح للموقع بالوصول إلى موقعك من إعدادات المتصفح.' :
+          error.code === 2 ? 'تعذر تحديد موقعك حالياً.' : 'انتهت مهلة تحديد الموقع. حاول مرة أخرى.';
+        alert(message);
+      }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 });
     }
 
     function customerMapButton(customerId) {
       const customer = getCustomerById(customerId);
-      if (!customer || !customer.gps) return '<span style="color:#94a3b8;font-size:.75rem;">لا يوجد موقع</span>';
-      return `<button type="button" class="customer-map-link" aria-label="فتح موقع ${String(customer.name || 'العميل').replace(/&/g, '&amp;').replace(/"/g, '&quot;')}" onclick="openCustomerMap('${String(customer.id).replace(/'/g, '')}')">🗺️ فتح الموقع</button>`;
+      if (!customer) return '<span style="color:#94a3b8;font-size:.75rem;">الزبون غير موجود</span>';
+      const label = customer.gps ? '📍 فتح الموقع' : '📍 تحديد الموقع';
+      return `<button type="button" class="customer-map-link" aria-label="${customer.gps ? 'فتح موقع' : 'تحديد موقع'} ${String(customer.name || 'العميل').replace(/&/g, '&amp;').replace(/"/g, '&quot;')}" onclick="openCustomerMap('${String(customer.id).replace(/'/g, '')}')">${label}</button>`;
     }
 
 
@@ -4907,7 +4938,7 @@ html,body,#app,.app-shell,.main-content,.view-section,.card,
       if (!customer) return alert('تعذر العثور على بيانات هذا الزبون.');
       const data = customerLedgerData(customer);
       const balanceLabel = data.balance > 0 ? 'دين مستحق' : data.balance < 0 ? 'رصيد دائن للزبون' : 'الحساب مسدد';
-      const gpsLabel = customer.gps ? '📍 ' + customerLedgerEscape(customer.storeName || customer.name || 'موقع الماركت') : 'لا يوجد موقع GPS محفوظ';
+      const gpsLabel = customer.gps ? '📍 ' + customerLedgerEscape(customer.storeName || customer.name || 'فتح الموقع في الخرائط') : '📍 اضغط لتحديد موقع الزبون';
       closeCustomerQuickProfile();
       const overlay = document.createElement('div');
       overlay.id = 'customerQuickProfileOverlay';
@@ -4923,7 +4954,7 @@ html,body,#app,.app-shell,.main-content,.view-section,.card,
             <div class="customer-quick-name">
               <strong>${customerLedgerEscape((customer.storeName || customer.name || 'بدون اسم') + (customer.name && customer.storeName ? ' / ' + customer.name : ''))}</strong>
               <small>${customerLedgerEscape(customer.phone || 'لا يوجد هاتف')}</small>
-              <button type="button" class="customer-quick-map-inline" onclick="openCustomerMap('${String(customer.id).replace(/'/g, '')}')" ${customer.gps ? '' : 'disabled'}>${gpsLabel}</button>
+              <button type="button" class="customer-quick-map-inline" onclick="openCustomerMap('${String(customer.id).replace(/'/g, '')}')" aria-label="${customer.gps ? 'فتح موقع الزبون في خرائط Google' : 'طلب إذن الموقع وتحديد موقع الزبون'}">${gpsLabel} <span aria-hidden="true">↗</span></button>
             </div>
             <div class="customer-quick-edit">✎</div>
           </div>
@@ -4966,7 +4997,9 @@ html,body,#app,.app-shell,.main-content,.view-section,.card,
         if (select) {
           renderCustomerDropdown('');
           select.value = String(customerId);
+          suppressCustomerProfileOnChange = true;
           select.dispatchEvent(new Event('change', { bubbles: true }));
+          suppressCustomerProfileOnChange = false;
         }
         const search = document.getElementById('customerSearchFilterInput');
         if (search) search.value = '';
@@ -5995,6 +6028,9 @@ html,body,#app,.app-shell,.main-content,.view-section,.card,
             wrap.insertBefore(hint, table);
           }
         }
+        wrap.setAttribute('role','region');
+        wrap.setAttribute('tabindex','0');
+        wrap.setAttribute('aria-label','اسحب يميناً ويساراً لعرض جميع تفاصيل الجدول');
         table.style.setProperty('display','table','important');
         table.style.setProperty('width','max-content','important');
         table.style.setProperty('min-width','820px','important');
@@ -6012,12 +6048,60 @@ html,body,#app,.app-shell,.main-content,.view-section,.card,
           });
       }
     }
+    // دعم السحب بالماوس على الحاسوب، مع إبقاء السحب باللمس طبيعياً على الهاتف.
+    function enableTableMouseDrag(rootNode) {
+      const root = rootNode || document;
+      const wraps = [];
+      if (root.matches && root.matches('.table-swipe-wrap')) wraps.push(root);
+      if (root.querySelectorAll) wraps.push(...root.querySelectorAll('.table-swipe-wrap'));
+      wraps.forEach(wrap => {
+        if (wrap.dataset.mouseDragReady === '1') return;
+        wrap.dataset.mouseDragReady = '1';
+        let down = false, moved = false, startX = 0, startScroll = 0;
+        wrap.addEventListener('pointerdown', event => {
+          if (event.pointerType !== 'mouse' || event.button !== 0) return;
+          down = true; moved = false; startX = event.clientX; startScroll = wrap.scrollLeft;
+        });
+        wrap.addEventListener('pointermove', event => {
+          if (!down || event.pointerType !== 'mouse') return;
+          const delta = event.clientX - startX;
+          if (Math.abs(delta) > 4) {
+            moved = true;
+            wrap.classList.add('is-mouse-dragging');
+            wrap.scrollLeft = startScroll - delta;
+            event.preventDefault();
+          }
+        });
+        const finish = () => {
+          if (!down) return;
+          down = false;
+          wrap.classList.remove('is-mouse-dragging');
+          if (moved) {
+            wrap.dataset.suppressClick = '1';
+            window.setTimeout(() => { delete wrap.dataset.suppressClick; }, 0);
+          }
+        };
+        wrap.addEventListener('pointerup', finish);
+        wrap.addEventListener('pointercancel', finish);
+        wrap.addEventListener('pointerleave', finish);
+        wrap.addEventListener('click', event => {
+          if (wrap.dataset.suppressClick === '1') {
+            event.preventDefault(); event.stopPropagation(); delete wrap.dataset.suppressClick;
+          }
+        }, true);
+      });
+    }
+
     function initMobileTableSwipe() {
       enableMobileTableSwipe(document);
+      enableTableMouseDrag(document);
       if (window.__mobileTableSwipeObserver) window.__mobileTableSwipeObserver.disconnect();
       window.__mobileTableSwipeObserver = new MutationObserver(records => {
         records.forEach(record => record.addedNodes.forEach(node => {
-          if (node.nodeType === 1) enableMobileTableSwipe(node);
+          if (node.nodeType === 1) {
+            enableMobileTableSwipe(node);
+            enableTableMouseDrag(node);
+          }
         }));
       });
       window.__mobileTableSwipeObserver.observe(document.body,{childList:true,subtree:true});
@@ -6028,6 +6112,17 @@ html,body,#app,.app-shell,.main-content,.view-section,.card,
       initMobileTableSwipe();
     }
 
-  </script>
+  
+    // فتح بطاقة حساب الزبون مباشرةً عند اختياره من قوائم الفواتير/السندات.
+    let suppressCustomerProfileOnChange = false;
+    document.addEventListener('change', event => {
+      const target = event.target;
+      if (!target || suppressCustomerProfileOnChange || !target.matches(
+        '#invoiceCustomerSelect, #receiptCustomerSelect, #driverReceiptCustomerSelect'
+      )) return;
+      if (target.value) showCustomerQuickProfile(target.value);
+    });
+
+</script>
 </body>
 </html>
