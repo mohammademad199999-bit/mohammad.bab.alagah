@@ -2794,6 +2794,29 @@ try {
       if (event.state && event.state.appNavigation) restoreAppNavigationState(event.state);
     });
 
+
+    // يمنع زر الرجوع في الهاتف من إغلاق النظام مباشرةً عند الوصول إلى أول صفحة.
+    // التنقلات الداخلية المسجلة بحالة appNavigation تبقى قابلة للرجوع خطوة بخطوة.
+    (function installMobileBackGuard() {
+      if (window.__mobileBackGuardInstalled) return;
+      window.__mobileBackGuardInstalled = true;
+      const guardState = { appBackGuard: true };
+      try {
+        if (!window.history.state || !window.history.state.appNavigation) {
+          window.history.pushState(guardState, '', window.location.href);
+        }
+      } catch (e) {}
+      window.addEventListener('popstate', function(event) {
+        // إذا كان الرجوع إلى حالة داخل النظام، اترك معالج التنقل الداخلي يعيد الصفحة السابقة.
+        if (event.state && event.state.appNavigation) return;
+        // إذا وصل المستخدم إلى تاريخ خارج التطبيق، أعد تثبيت حاجز الرجوع
+        // حتى لا يغلق النظام بلمسة واحدة. لا نغيّر حالة الصفحة أو تسجيل الدخول.
+        try {
+          window.history.pushState(guardState, '', window.location.href);
+        } catch (e) {}
+      });
+    })();
+
     function showWorkspacePanel(panel, title, button, dashboard) {
       pushAppNavigationState(panel, title);
       dashboard.querySelectorAll(':scope > .nav-panel-item').forEach(el => el.classList.add('nav-panel-hidden'));
@@ -3803,7 +3826,144 @@ try {
             button{display:none!important}
             .hidden{display:none!important}
             *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
-          </style></head><body>${element.innerHTML}</body></html>`);
+          
+    /* تحسين شامل لسحب الجداول والفواتير على جميع الأدوار */
+    .table-swipe-wrap{
+      display:block;width:100%;max-width:100%;min-width:0;
+      overflow-x:auto;overflow-y:hidden;
+      -webkit-overflow-scrolling:touch;
+      overscroll-behavior-x:contain;
+      touch-action:pan-x pan-y;
+      scrollbar-width:thin;
+      border-radius:10px;
+      position:relative;
+      margin:8px 0 14px;
+      direction:ltr;
+    }
+    .table-swipe-wrap > table{
+      direction:rtl;
+      width:max-content;
+      min-width:100%;
+      border-collapse:separate;
+      border-spacing:0;
+    }
+    .table-swipe-wrap .data-table{
+      display:table!important;
+      width:max-content!important;
+      min-width:100%!important;
+      max-width:none!important;
+      overflow:visible!important;
+      white-space:normal;
+      margin:0!important;
+    }
+    .table-swipe-wrap th,.table-swipe-wrap td{
+      white-space:normal;
+      min-width:90px;
+      max-width:260px;
+      overflow-wrap:anywhere;
+      vertical-align:middle;
+    }
+    .table-swipe-wrap th{white-space:nowrap}
+    .table-swipe-wrap td{line-height:1.55}
+    .table-swipe-hint{
+      display:none;
+      direction:rtl;
+      text-align:center;
+      color:#64748b;
+      font-size:11px;
+      padding:4px 8px 7px;
+      user-select:none;
+    }
+    .invoice-actions-mobile{
+      display:flex!important;
+      flex-wrap:wrap!important;
+      gap:7px!important;
+      min-width:190px;
+      width:100%;
+    }
+    .invoice-actions-mobile button{
+      display:inline-flex!important;
+      align-items:center;justify-content:center;
+      min-height:42px!important;
+      flex:1 1 130px;
+      width:auto!important;
+      white-space:normal!important;
+      line-height:1.35;
+    }
+    #adminDelegateSubmittedOrdersContainer .table-swipe-wrap table{min-width:900px}
+    #adminDelegateSubmittedOrdersContainer .invoice-actions-mobile{min-width:220px}
+    #adminDelegateSubmittedOrdersContainer .invoice-actions-mobile button{flex:1 1 100%}
+    .view-section,.main-content,.card,.modal-content{min-width:0;max-width:100%}
+    .order-card,.card p,.card small,.view-section p{overflow-wrap:anywhere}
+    @media(max-width:700px){
+      .table-swipe-wrap{margin-inline:0;width:100%;max-width:100%;border:1px solid #e2e8f0}
+      .table-swipe-hint{display:block}
+      .table-swipe-wrap > table,.table-swipe-wrap .data-table{min-width:760px!important}
+      #adminDelegateSubmittedOrdersContainer .table-swipe-wrap > table,
+      #adminDelegateSubmittedOrdersContainer .table-swipe-wrap .data-table{min-width:980px!important}
+      .invoice-actions-mobile{min-width:210px}
+      .invoice-actions-mobile button{min-height:44px!important}
+      #adminDelegateSubmittedOrdersContainer .invoice-actions-mobile button{width:100%!important}
+      .modal{overflow-y:auto}
+    }
+    @media(max-width:380px){
+      .table-swipe-wrap > table,.table-swipe-wrap .data-table{min-width:700px!important}
+      #adminDelegateSubmittedOrdersContainer .table-swipe-wrap > table,
+      #adminDelegateSubmittedOrdersContainer .table-swipe-wrap .data-table{min-width:920px!important}
+    }
+
+/* إصلاح فعلي لتمرير المحتوى أفقياً على الهاتف في كل أدوار النظام */
+html,body,#app,.app-shell,.main-content,.view-section,.card,
+#adminDelegateSubmittedOrdersContainer,#adminInvoiceAccountsSummary,#adminDriverAccountDetails{
+  min-width:0;max-width:100%;
+}
+@media (max-width: 768px){
+  body{overflow-x:hidden!important}
+  .main-content,.view-section,.card{overflow-x:visible!important}
+  .table-swipe-wrap,
+  .mobile-horizontal-scroll,
+  #adminDelegateSubmittedOrdersContainer > div[style*="overflow"],
+  #adminDriverAccountDetails div[style*="overflow"],
+  #adminInvoiceAccountsSummary div[style*="overflow"]{
+    display:block!important;
+    width:100%!important;max-width:100%!important;min-width:0!important;
+    overflow-x:auto!important;overflow-y:hidden!important;
+    -webkit-overflow-scrolling:touch!important;
+    overscroll-behavior-x:contain;
+    touch-action:pan-x pan-y!important;
+    direction:ltr!important;
+    scrollbar-width:thin;
+    position:relative;
+  }
+  .table-swipe-wrap table,
+  .mobile-horizontal-scroll table,
+  #adminDelegateSubmittedOrdersContainer table,
+  #adminDriverAccountDetails table,
+  #adminInvoiceAccountsSummary table{
+    width:max-content!important;min-width:900px!important;max-width:none!important;
+    table-layout:auto!important;direction:rtl!important;
+  }
+  #adminDelegateSubmittedOrdersContainer table{min-width:1080px!important}
+  #adminDelegateSubmittedOrdersContainer th,
+  #adminDelegateSubmittedOrdersContainer td,
+  #adminDriverAccountDetails th,#adminDriverAccountDetails td,
+  #adminInvoiceAccountsSummary th,#adminInvoiceAccountsSummary td{
+    white-space:normal!important;min-width:105px;max-width:260px;
+    overflow-wrap:anywhere;vertical-align:middle;
+  }
+  .invoice-actions-mobile{
+    display:flex!important;flex-direction:column!important;gap:8px!important;
+    min-width:150px!important;width:100%!important;overflow:visible!important;
+  }
+  .invoice-actions-mobile button{
+    display:flex!important;visibility:visible!important;opacity:1!important;
+    position:static!important;min-height:46px!important;width:100%!important;
+    flex:0 0 auto!important;white-space:normal!important;pointer-events:auto!important;
+    z-index:2;
+  }
+  .table-swipe-hint{display:block!important;direction:rtl;text-align:center;color:#64748b;font-size:12px;padding:7px}
+}
+</style></head><body>${element.innerHTML}</body></html>`);
         popup.document.close();
         const doPrint = () => {
           try {
@@ -3830,58 +3990,89 @@ try {
         return false;
       }
       pdfExportInProgress = true;
-      const oldDisplay = element.style.display;
-      const oldPosition = element.style.position;
-      const oldLeft = element.style.left;
-      const oldTop = element.style.top;
-      const oldWidth = element.style.width;
-
+      const safeFilename = String(filename || 'Report.pdf').replace(/[\\/:*?"<>|]/g, '_');
+      const oldStyles = {
+        display: element.style.display, position: element.style.position,
+        left: element.style.left, top: element.style.top, width: element.style.width
+      };
+      // فتح نافذة احتياطية مباشرة من ضغطة المستخدم؛ هذا يمنع حظر popup في متصفحات الهاتف.
+      let printWindow = null;
+      try { printWindow = window.open('about:blank', '_blank'); } catch (e) {}
       try {
         element.style.display = 'block';
         element.style.position = 'relative';
         element.style.left = 'auto';
         element.style.top = 'auto';
         element.style.width = '100%';
-
-        // إتاحة وقت للمتصفح لإعادة حساب التخطيط قبل التقاط التقرير.
         await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
 
         try {
-          const html2pdfFactory = await loadHtml2PdfLibrary();
-          await html2pdfFactory().set({
+          const factory = await loadHtml2PdfLibrary();
+          const worker = factory().set({
             margin: [8, 8, 10, 8],
-            filename: filename,
-            image: { type: 'jpeg', quality: 0.95 },
+            filename: safeFilename,
+            image: { type: 'jpeg', quality: 0.92 },
             html2canvas: {
-              scale: 1.5,
-              useCORS: true,
-              allowTaint: false,
-              backgroundColor: '#ffffff',
-              logging: false,
-              scrollX: 0,
-              scrollY: 0,
+              scale: 1.35, useCORS: true, allowTaint: false,
+              backgroundColor: '#ffffff', logging: false,
+              scrollX: 0, scrollY: 0,
               windowWidth: Math.max(document.documentElement.clientWidth, element.scrollWidth || 0)
             },
             pagebreak: { mode: ['css', 'legacy'] },
             jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-          }).from(element).save();
+          }).from(element);
+          // save() لا يُعد نجاحاً إلا بعد اكتمال توليد الملف وتنزيله.
+          await worker.save();
+          if (printWindow && !printWindow.closed) printWindow.close();
+          alert('تم إنشاء تقرير PDF وبدء تنزيله. تحقق من مجلد التنزيلات.');
           return true;
         } catch (pdfError) {
-          console.warn('Direct PDF export failed; switching to print fallback:', pdfError);
-          alert('تعذر إنشاء PDF مباشرة. سنفتح نافذة الطباعة؛ اختر «حفظ بتنسيق PDF» من الطابعة.');
-          await printReportAsPDF(element, filename);
-          return true;
+          console.error('HTML2PDF failed:', pdfError);
+          if (!printWindow || printWindow.closed) {
+            alert('تعذر تنزيل PDF تلقائياً، كما منع المتصفح فتح نافذة الطباعة. اسمح بالنوافذ المنبثقة لهذا الموقع ثم أعد المحاولة.');
+            return false;
+          }
+          // بديل الطباعة يُكتب في النافذة التي فُتحت أثناء ضغطة المستخدم.
+          const styles = Array.from(document.querySelectorAll('style, link[rel="stylesheet"]'))
+            .map(node => node.outerHTML).join('\n');
+          const clone = element.cloneNode(true);
+          clone.style.display = 'block';
+          clone.style.position = 'static';
+          clone.style.width = '100%';
+          printWindow.document.open();
+          printWindow.document.write(`<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${safeFilename}</title>${styles}
+            <style>
+              @page{size:A4;margin:12mm}
+              html,body{background:#fff!important;color:#111!important;font-family:Arial,sans-serif!important}
+              body{padding:0!important;margin:0!important}
+              table{width:100%;border-collapse:collapse;page-break-inside:auto}
+              tr{page-break-inside:avoid;page-break-after:auto}
+              th,td{border:1px solid #bbb;padding:6px;text-align:right;color:#111!important}
+              button,.no-print{display:none!important}
+              .hidden{display:none!important}
+              *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+            </style></head><body></body></html>`);
+          printWindow.document.close();
+          printWindow.document.body.appendChild(clone);
+          printWindow.document.title = safeFilename;
+          alert('تعذر التنزيل المباشر. فُتحت نسخة الطباعة؛ اختر «حفظ بتنسيق PDF» من قائمة الطابعة لحفظ التقرير.');
+          setTimeout(() => {
+            try { printWindow.focus(); printWindow.print(); }
+            catch (e) { alert('لم يتم فتح الطباعة. اختر طباعة من قائمة المتصفح ثم حفظ PDF.'); }
+          }, 700);
+          return false;
         }
       } catch (error) {
         console.error('PDF export failed:', error);
-        alert('تعذر تصدير التقرير: ' + (error.message || error));
+        if (printWindow && !printWindow.closed) printWindow.close();
+        alert('فشل تصدير التقرير: ' + (error.message || error));
         return false;
       } finally {
-        element.style.display = oldDisplay;
-        element.style.position = oldPosition;
-        element.style.left = oldLeft;
-        element.style.top = oldTop;
-        element.style.width = oldWidth;
+        element.style.display = oldStyles.display;
+        element.style.position = oldStyles.position;
+        element.style.left = oldStyles.left;
+        element.style.top = oldStyles.top;
+        element.style.width = oldStyles.width;
         pdfExportInProgress = false;
       }
     }
@@ -4621,32 +4812,47 @@ try {
 
     // يجمع كميات النكهات المختلفة للمنتج نفسه بشرط تطابق سعر الكارتون.
     // عند بلوغ الحد الذي حدده المدير، يطبق الخصم على كل كراتين المجموعة.
+    // الخصم التجميعي: يجمع كل النكهات للمنتج نفسه وبسعر الكارتون نفسه.
+    // لا يعتمد على اسم النكهة إطلاقاً، ويعيد الحساب من السعر الأساسي دائماً لمنع تراكم الخصم.
     function recalculateCartDiscounts() {
       const groups = new Map();
+      const normalizeProductName = value => String(value || '').trim().replace(/\s+/g, ' ').toLocaleLowerCase('ar');
       currentCartItems.forEach(item => {
-        const basePrice = Number(item.baseUnitPrice ?? item.unitPrice ?? 0);
-        item.baseUnitPrice = basePrice;
-        const key = `${String(item.productId)}__${basePrice}`;
-        if (!groups.has(key)) groups.set(key, { quantity: 0, items: [], product: state.products.find(p => String(p.id) === String(item.productId)) });
+        const product = state.products.find(p => String(p.id) === String(item.productId)) ||
+          state.products.find(p => normalizeProductName(p.name) === normalizeProductName(item.productName));
+        // حفظ السعر الأصلي قبل أي خصم. للسلات القديمة نستخدم السعر الحالي كقيمة أولية.
+        let basePrice = Number(item.baseUnitPrice);
+        if (!Number.isFinite(basePrice) || basePrice < 0) {
+          basePrice = Number(item.unitPrice || product?.price || 0);
+          item.baseUnitPrice = basePrice;
+        }
+        const productKey = product ? String(product.id) : normalizeProductName(item.productName);
+        const priceKey = Math.round(basePrice * 100) / 100;
+        const key = `${productKey}__${priceKey}`;
+        if (!groups.has(key)) {
+          groups.set(key, { quantity: 0, items: [], product });
+        }
         const group = groups.get(key);
-        group.quantity += Number(item.quantity || 0);
+        group.quantity += Math.max(0, Number(item.quantity || 0));
         group.items.push(item);
       });
 
       groups.forEach(group => {
-        const product = group.product;
-        const minQty = Number(product?.minQtyDiscount || 0);
-        const discount = Number(product?.discountPerCarton || 0);
+        const minQty = Number(group.product?.minQtyDiscount || 0);
+        const discount = Number(group.product?.discountPerCarton || 0);
         const qualifies = minQty > 0 && discount > 0 && group.quantity >= minQty;
         group.items.forEach(item => {
           const basePrice = Number(item.baseUnitPrice || 0);
           const finalUnitPrice = qualifies ? Math.max(0, basePrice - discount) : basePrice;
           item.unitPrice = finalUnitPrice;
-          item.totalPrice = finalUnitPrice * Number(item.quantity || 0);
-          item.discountApplied = qualifies ? discount : 0;
+          item.totalPrice = finalUnitPrice * Math.max(0, Number(item.quantity || 0));
+          item.discountApplied = qualifies ? Math.min(discount, basePrice) : 0;
+          item.discountGroupQuantity = group.quantity;
+          item.discountThreshold = minQty;
         });
       });
-      localStorage.setItem('app_current_cart', JSON.stringify(currentCartItems));
+      try { localStorage.setItem('app_current_cart', JSON.stringify(currentCartItems)); } catch (e) {}
+      return currentCartItems;
     }
 
     function addSelectedProductToCart(productId) {
@@ -5319,6 +5525,57 @@ try {
         updateCloudSyncBadge('🔒 سجّل الدخول بحساب Firebase للاتصال بالبيانات', '#94a3b8');
       }
     };
+  
+    // يغلّف كل جدول بيانات يُنشأ ديناميكياً داخل منطقة سحب أفقية تعمل باللمس.
+    function enableMobileTableSwipe(rootNode) {
+      const root = rootNode || document;
+      const tables = [];
+      if (root.matches && root.matches('table')) tables.push(root);
+      if (root.querySelectorAll) tables.push(...root.querySelectorAll('table'));
+      tables.forEach(table => {
+        if (!table || table.dataset.mobileSwipeReady === '1') return;
+        table.dataset.mobileSwipeReady = '1';
+        let wrap = table.parentElement;
+        // إذا كان الجدول داخل حاوية تمرير موجودة، نصلح الحاوية نفسها ولا نتركها بإعدادات سطح المكتب.
+        if (wrap && (wrap.scrollWidth > wrap.clientWidth || /overflow-x\s*:\s*auto|scroll/i.test(wrap.getAttribute('style') || '') || wrap.classList.contains('table-swipe-wrap'))) {
+          wrap.classList.add('mobile-horizontal-scroll');
+        } else {
+          wrap = document.createElement('div');
+          wrap.className = 'table-swipe-wrap mobile-horizontal-scroll';
+          wrap.setAttribute('role','region');
+          wrap.setAttribute('tabindex','0');
+          wrap.setAttribute('aria-label','اسحب يميناً ويساراً لعرض جميع تفاصيل الجدول');
+          table.parentNode.insertBefore(wrap,table);
+          wrap.appendChild(table);
+          const hint=document.createElement('div');
+          hint.className='table-swipe-hint';
+          hint.textContent='↔ اسحب الجدول يميناً ويساراً لقراءة بقية التفاصيل';
+          wrap.insertBefore(hint,table);
+        }
+        table.style.width='max-content';
+        table.style.minWidth = table.closest('#adminDelegateSubmittedOrdersContainer') ? '1080px' : '900px';
+      });
+      // دعم حاويات التقارير الموجودة مسبقاً حتى لو لم تكن جداولها تحمل class محدداً.
+      if (root.querySelectorAll) {
+        root.querySelectorAll('#adminDelegateSubmittedOrdersContainer div[style*="overflow"], #adminDriverAccountDetails div[style*="overflow"], #adminInvoiceAccountsSummary div[style*="overflow"]').forEach(el=>el.classList.add('mobile-horizontal-scroll'));
+      }
+    }
+    function initMobileTableSwipe() {
+      enableMobileTableSwipe(document);
+      if (window.__mobileTableSwipeObserver) window.__mobileTableSwipeObserver.disconnect();
+      window.__mobileTableSwipeObserver = new MutationObserver(records => {
+        records.forEach(record => record.addedNodes.forEach(node => {
+          if (node.nodeType === 1) enableMobileTableSwipe(node);
+        }));
+      });
+      window.__mobileTableSwipeObserver.observe(document.body,{childList:true,subtree:true});
+    }
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded',initMobileTableSwipe,{once:true});
+    } else {
+      initMobileTableSwipe();
+    }
+
   </script>
 </body>
 </html>
