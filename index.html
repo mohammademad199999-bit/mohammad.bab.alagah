@@ -242,10 +242,47 @@
       .screen-zoom-tools { left:8px; bottom:calc(10px + env(safe-area-inset-bottom)); }
     }
     @media print {
-      body * { visibility: hidden; }
-      #printInvoiceModal, #printInvoiceModal *, #receiptModal, #receiptModal *, #editInvoiceModal, #editInvoiceModal * { visibility: visible; }
-      #printInvoiceModal, #receiptModal, #editInvoiceModal { position: absolute; left: 0; top: 0; background: none; width: 100%; box-shadow: none; }
-      .no-print { display: none !important; }
+      html, body { width:100%!important; height:auto!important; min-height:0!important; margin:0!important; padding:0!important; overflow:visible!important; background:#fff!important; }
+      body * { visibility:hidden; }
+      #printInvoiceModal, #printInvoiceModal *, #receiptModal, #receiptModal *, #customerStatementModal, #customerStatementModal * { visibility:visible; }
+      #editInvoiceModal, #editInvoiceModal * { visibility:hidden!important; }
+      #printInvoiceModal, #receiptModal, #customerStatementModal {
+        position:static!important; inset:auto!important; display:block!important;
+        width:100%!important; height:auto!important; min-height:0!important;
+        max-width:none!important; max-height:none!important; margin:0!important;
+        padding:0!important; overflow:visible!important; background:#fff!important;
+        box-shadow:none!important; border:0!important;
+      }
+      #printInvoiceModal.hidden, #receiptModal.hidden, #customerStatementModal.hidden { display:none!important; }
+      #printInvoiceModal .invoice-paper, #receiptModal .invoice-paper, #customerStatementModal .invoice-paper,
+      #invoicePaperContainer, #receiptPaperContainer, #customerStatementPaper {
+        display:block!important; position:static!important; box-sizing:border-box!important;
+        width:100%!important; min-width:0!important; max-width:none!important;
+        height:auto!important; min-height:0!important; max-height:none!important;
+        margin:0!important; padding:0!important; overflow:visible!important;
+        border:0!important; border-radius:0!important; box-shadow:none!important;
+        background:#fff!important; font-size:10pt!important; color:#111!important;
+      }
+      #invoicePaperContainer.size-a4, #receiptPaperContainer.size-a4 { font-size:10pt!important; }
+      #invoicePaperContainer.size-a5, #receiptPaperContainer.size-a5 { font-size:9pt!important; }
+      #invoicePaperContainer.size-pos, #receiptPaperContainer.size-pos { font-size:8pt!important; }
+      #invoicePaperContainer .inv-table, #receiptPaperContainer .inv-table,
+      #customerStatementPaper .inv-table { width:100%!important; min-width:0!important; max-width:100%!important; table-layout:fixed!important; border-collapse:collapse!important; }
+      #invoicePaperContainer .inv-table th, #invoicePaperContainer .inv-table td,
+      #receiptPaperContainer .inv-table th, #receiptPaperContainer .inv-table td,
+      #customerStatementPaper .inv-table th, #customerStatementPaper .inv-table td {
+        white-space:normal!important; overflow-wrap:anywhere!important; word-break:normal!important;
+        padding:4pt!important; font-size:inherit!important;
+      }
+      #invoicePaperContainer .inv-header, #invoicePaperContainer .inv-details { break-inside:avoid; page-break-inside:avoid; }
+      #invoicePaperContainer .inv-total, #invoicePaperContainer .inv-footer-slogan,
+      #receiptPaperContainer > div, #customerStatementPaper > div { break-inside:avoid; page-break-inside:avoid; }
+      #invoicePaperContainer tr, #receiptPaperContainer tr, #customerStatementPaper tr { break-inside:avoid; page-break-inside:avoid; }
+      #invoicePaperContainer .inv-logo { max-width:60pt!important; max-height:60pt!important; }
+      #invoicePaperContainer #invoiceQrCanvas { max-width:72pt!important; max-height:72pt!important; }
+      #invoicePaperContainer .inv-footer, #receiptPaperContainer .inv-footer, .no-print { display:none!important; }
+      #invoicePaperContainer p, #receiptPaperContainer p { overflow-wrap:anywhere!important; }
+      * { -webkit-print-color-adjust:exact!important; print-color-adjust:exact!important; }
     }
 
 
@@ -3774,7 +3811,7 @@ try {
       const clearedCommission = allOrders.filter(o => o.commissionCleared).reduce((sum,o)=>sum+Number(o.delegateCommission||0),0);
       const settlements = (state.staffSettlements || []).filter(x => String(x.staffId) === active.staffId && x.staffRole === active.role).slice().reverse();
       const ordersHtml = dailyOrders.length ? `<div class="staff-profile-table-scroll" role="region" tabindex="0" aria-label="جدول قابل للسحب يميناً ويساراً"><div class="staff-profile-swipe-hint">↔ اسحب يميناً ويساراً لعرض جميع الأعمدة</div><table class="data-table"><thead><tr><th>الفاتورة</th><th>التاريخ</th><th>الزبون</th><th>المبلغ</th><th>الحالة</th><th>المدفوع</th></tr></thead><tbody>${dailyOrders.slice().sort((a,b)=>Number(b.id)-Number(a.id)).map(o=>`<tr><td>#${o.id}</td><td>${staffOrderDate(o)||'—'}</td><td>${escapeStaffText(o.customerName||'—')}</td><td>${staffMoney(o.totalPrice)}</td><td>${escapeStaffText(o.status||'—')}</td><td>${staffMoney(staffPaidForOrder(o))}</td></tr>`).join('')}</tbody></table></div>` : '<p class="muted-note">لا توجد فواتير لهذا التاريخ.</p>';
-      const allInvoicesHtml = allOrders.length ? `<div class="staff-profile-table-scroll" role="region" tabindex="0" aria-label="جدول قابل للسحب يميناً ويساراً"><div class="staff-profile-swipe-hint">↔ اسحب يميناً ويساراً لعرض جميع الأعمدة</div><table class="data-table"><thead><tr><th>رقم الفاتورة</th><th>التاريخ</th><th>الزبون</th><th>المبلغ</th><th>حالة الطلب</th><th>إجراءات الفاتورة</th></tr></thead><tbody>${allOrders.slice().sort((a,b)=>Number(b.id)-Number(a.id)).map(o=>`<tr><td><strong>#${o.id}</strong></td><td>${escapeStaffText(staffOrderDate(o)||'—')}</td><td>${escapeStaffText(o.customerName||'—')}</td><td>${staffMoney(o.totalPrice)}</td><td>${escapeStaffText(o.status||'—')}</td><td><div style="display:flex;gap:5px;flex-wrap:wrap"><button type="button" class="btn-secondary" onclick="openInvoicePrint(${Number(o.id)})">فتح</button><button type="button" class="btn-primary" onclick="openEditInvoiceModal(${Number(o.id)})">تحرير</button>${state.currentUser && state.currentUser.role === 'admin' ? `<button type="button" class="btn-danger" onclick="deleteInvoiceByAdmin(${Number(o.id)})">حذف</button>` : ''}<button type="button" class="btn-success" onclick="openInvoicePrint(${Number(o.id)});setTimeout(()=>window.print(),250)">طباعة</button><button type="button" class="btn-share" onclick="shareOrderWhatsAppAdvanced(${Number(o.id)})">مشاركة</button></div></td></tr>`).join('')}</tbody></table></div>` : '<p class="muted-note">لا توجد فواتير مسجلة لهذا الحساب.</p>';
+      const allInvoicesHtml = allOrders.length ? `<div class="staff-profile-table-scroll" role="region" tabindex="0" aria-label="جدول قابل للسحب يميناً ويساراً"><div class="staff-profile-swipe-hint">↔ اسحب يميناً ويساراً لعرض جميع الأعمدة</div><table class="data-table"><thead><tr><th>رقم الفاتورة</th><th>التاريخ</th><th>الزبون</th><th>المبلغ</th><th>حالة الطلب</th><th>إجراءات الفاتورة</th></tr></thead><tbody>${allOrders.slice().sort((a,b)=>Number(b.id)-Number(a.id)).map(o=>`<tr><td><strong>#${o.id}</strong></td><td>${escapeStaffText(staffOrderDate(o)||'—')}</td><td>${escapeStaffText(o.customerName||'—')}</td><td>${staffMoney(o.totalPrice)}</td><td>${escapeStaffText(o.status||'—')}</td><td><div style="display:flex;gap:5px;flex-wrap:wrap"><button type="button" class="btn-secondary" onclick="openInvoicePrint(${Number(o.id)})">فتح</button><button type="button" class="btn-primary" onclick="openEditInvoiceModal(${Number(o.id)})">تحرير</button>${state.currentUser && state.currentUser.role === 'admin' ? `<button type="button" class="btn-danger" onclick="deleteInvoiceByAdmin(${Number(o.id)})">حذف</button>` : ''}<button type="button" class="btn-success" onclick="openInvoicePrint(${Number(o.id)});setTimeout(()=>printInvoiceWithSelectedSize(),250)">طباعة</button><button type="button" class="btn-share" onclick="shareOrderWhatsAppAdvanced(${Number(o.id)})">مشاركة</button></div></td></tr>`).join('')}</tbody></table></div>` : '<p class="muted-note">لا توجد فواتير مسجلة لهذا الحساب.</p>';
       const receiptsHtml = dailyReceipts.length ? `<div class="staff-profile-table-scroll" role="region" tabindex="0" aria-label="جدول قابل للسحب يميناً ويساراً"><div class="staff-profile-swipe-hint">↔ اسحب يميناً ويساراً لعرض جميع الأعمدة</div><table class="data-table"><thead><tr><th>رقم السند</th><th>التاريخ</th><th>الزبون</th><th>المبلغ</th><th>ملاحظات</th><th>فتح</th></tr></thead><tbody>${dailyReceipts.slice().reverse().map(r=>`<tr><td>#${r.id}</td><td>${escapeStaffText(r.date||r.rawDate||'—')}</td><td>${escapeStaffText(r.customerName||'—')}</td><td>${staffMoney(r.amount)}</td><td>${escapeStaffText(r.notes||'—')}</td><td><button class="btn-secondary" onclick="openReceiptModal(${r.id})">عرض</button></td></tr>`).join('')}</tbody></table></div>` : '<p class="muted-note">لا توجد سندات قبض لهذا التاريخ.</p>';
       const settlementsHtml = settlements.length ? `<div class="staff-profile-table-scroll" role="region" tabindex="0" aria-label="جدول قابل للسحب يميناً ويساراً"><div class="staff-profile-swipe-hint">↔ اسحب يميناً ويساراً لعرض جميع الأعمدة</div><table class="data-table"><thead><tr><th>التاريخ</th><th>المبلغ المستلم</th><th>العمولة المسوّاة</th><th>عدد الفواتير</th><th>ملاحظات</th></tr></thead><tbody>${settlements.map(x=>`<tr><td>${escapeStaffText(x.dateLabel||x.rawDate||'—')}</td><td>${staffMoney(x.cashAmount)}</td><td>${staffMoney(x.commissionAmount)}</td><td>${Number(x.ordersCount||0)}</td><td>${escapeStaffText(x.notes||'استلام حساب')}</td></tr>`).join('')}</tbody></table></div>` : '<p class="muted-note">لا توجد عمليات استلام حساب سابقة.</p>';
       document.getElementById('staffProfileTitle').textContent = `السجل التفصيلي — ${staff.name}`;
@@ -4261,7 +4298,43 @@ html,body,#app,.app-shell,.main-content,.view-section,.card,
               button,.no-print{display:none!important}
               .hidden{display:none!important}
               *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
-            </style></head><body></body></html>`);
+            
+/* إصلاح السحب الأفقي في لوحة المندوب: غلاف حقيقي حول كل جدول */
+#delegateDashboard .delegate-table-scroll{
+  display:block!important; position:relative!important; width:100%!important;
+  max-width:100%!important; min-width:0!important; overflow-x:scroll!important;
+  overflow-y:hidden!important; -webkit-overflow-scrolling:touch!important;
+  overscroll-behavior-x:contain!important; touch-action:pan-x!important;
+  direction:ltr!important; scrollbar-width:auto!important;
+  scrollbar-color:#64748b #e2e8f0; border:1px solid #cbd5e1!important;
+  border-radius:10px!important; margin:10px 0 16px!important;
+  background:#fff!important; cursor:grab!important;
+}
+#delegateDashboard .delegate-table-scroll.is-dragging{cursor:grabbing!important;user-select:none!important}
+#delegateDashboard .delegate-table-scroll > table.data-table{
+  display:table!important; width:max-content!important; min-width:1050px!important;
+  max-width:none!important; table-layout:auto!important; overflow:visible!important;
+  white-space:normal!important; direction:rtl!important; margin:0!important;
+  border-collapse:collapse!important;
+}
+#delegateDashboard .delegate-table-scroll th,
+#delegateDashboard .delegate-table-scroll td{
+  min-width:125px!important; white-space:nowrap!important;
+  padding:10px 13px!important; overflow-wrap:normal!important;
+}
+#delegateDashboard .delegate-table-swipe-hint{
+  display:block!important; width:100%!important; padding:9px 12px!important;
+  text-align:center!important; direction:rtl!important; color:#334155!important;
+  background:#eaf1fb!important; border-bottom:1px solid #cbd5e1!important;
+  font-size:13px!important; font-weight:800!important; pointer-events:none!important;
+}
+@media(max-width:768px){
+  #delegateDashboard .delegate-table-scroll{width:100%!important;overflow-x:scroll!important}
+  #delegateDashboard .delegate-table-scroll > table.data-table{min-width:1200px!important}
+  #delegateDashboard .delegate-table-scroll th,
+  #delegateDashboard .delegate-table-scroll td{min-width:145px!important}
+}
+</style></head><body></body></html>`);
           printWindow.document.close();
           printWindow.document.body.appendChild(clone);
           printWindow.document.title = safeFilename;
@@ -5893,9 +5966,15 @@ html,body,#app,.app-shell,.main-content,.view-section,.card,
       exportElementToPDF(element, `Invoice_${window.currentPrintOrderId || 'file'}.pdf`);
     }
 
+    function printInvoiceWithSelectedSize() {
+      prepareInvoicePrint();
+      window.print();
+    }
+
     function printThermalBluetooth() {
       document.getElementById('invoiceSizeSelector').value = 'size-pos';
       changeInvoiceSize('size-pos');
+      prepareInvoicePrint();
       window.print();
     }
 
@@ -5924,7 +6003,32 @@ html,body,#app,.app-shell,.main-content,.view-section,.card,
     }
 
     function changeInvoiceSize(sizeClass) {
-      document.getElementById('invoicePaperContainer').className = "invoice-paper " + sizeClass;
+      const allowed = ['size-a4','size-a5','size-pos'];
+      const safeSize = allowed.includes(sizeClass) ? sizeClass : 'size-a4';
+      document.getElementById('invoicePaperContainer').className = "invoice-paper " + safeSize;
+      setInvoicePrintPageRule(safeSize);
+    }
+
+    function setInvoicePrintPageRule(sizeClass) {
+      const rules = {
+        'size-a4': '@page { size: A4 portrait; margin: 8mm; }',
+        'size-a5': '@page { size: A5 portrait; margin: 6mm; }',
+        'size-pos': '@page { size: 80mm auto; margin: 2mm; }'
+      };
+      let style = document.getElementById('dynamicInvoicePrintPageRule');
+      if (!style) {
+        style = document.createElement('style');
+        style.id = 'dynamicInvoicePrintPageRule';
+        document.head.appendChild(style);
+      }
+      style.textContent = rules[sizeClass] || rules['size-a4'];
+    }
+
+    function prepareInvoicePrint() {
+      const selected = document.getElementById('invoiceSizeSelector')?.value || 'size-a4';
+      setInvoicePrintPageRule(selected);
+      const paper = document.getElementById('invoicePaperContainer');
+      if (paper) paper.className = 'invoice-paper ' + selected;
     }
 
     function openInvoicePrint(orderId) {
@@ -6255,6 +6359,80 @@ html,body,#app,.app-shell,.main-content,.view-section,.card,
       document.addEventListener('mouseup',endMouse,true);
       document.addEventListener('mouseleave',endMouse,true);
     })();
+    document.addEventListener('DOMContentLoaded', function(){ prepareInvoicePrint(); });
+
+/* إنشاء حاويات سحب فعلية لكل جداول المندوب، بما فيها الجداول التي يعاد رسمها */
+(function installDelegateTableScroll(){
+  function wrapTables(){
+    const root=document.getElementById('delegateDashboard');
+    if(!root) return;
+    root.querySelectorAll('table.data-table').forEach(table=>{
+      if(table.closest('.delegate-table-scroll')) return;
+      const wrap=document.createElement('div');
+      wrap.className='delegate-table-scroll';
+      wrap.setAttribute('role','region');
+      wrap.setAttribute('tabindex','0');
+      wrap.setAttribute('aria-label','جدول قابل للسحب يميناً ويساراً');
+      const hint=document.createElement('div');
+      hint.className='delegate-table-swipe-hint';
+      hint.textContent='↔ اسحب يميناً أو يساراً لرؤية بقية التفاصيل';
+      table.parentNode.insertBefore(wrap,table);
+      wrap.appendChild(hint);
+      wrap.appendChild(table);
+    });
+  }
+  if(document.readyState==='loading'){
+    document.addEventListener('DOMContentLoaded',wrapTables,{once:true});
+  } else { wrapTables(); }
+  const root=document.getElementById('delegateDashboard');
+  if(root && !root.__delegateTableObserver){
+    root.__delegateTableObserver=new MutationObserver(()=>wrapTables());
+    root.__delegateTableObserver.observe(root,{childList:true,subtree:true});
+  }
+  // Touch drag and mouse drag are attached to the actual scroll wrapper.
+  let touch=null, mouse=null;
+  document.addEventListener('touchstart',e=>{
+    const wrap=e.target.closest && e.target.closest('#delegateDashboard .delegate-table-scroll');
+    if(!wrap || e.touches.length!==1) return;
+    const t=e.touches[0]; touch={wrap,x:t.clientX,y:t.clientY,last:t.clientX,active:false};
+  },{capture:true,passive:true});
+  document.addEventListener('touchmove',e=>{
+    if(!touch || e.touches.length!==1) return;
+    const t=e.touches[0],dx=t.clientX-touch.x,dy=t.clientY-touch.y;
+    if(!touch.active && Math.abs(dx)>6 && Math.abs(dx)>Math.abs(dy)*1.1){
+      touch.active=true; touch.wrap.classList.add('is-dragging');
+    }
+    if(touch.active){
+      e.preventDefault();
+      touch.wrap.scrollLeft-=t.clientX-touch.last;
+      touch.last=t.clientX;
+    }
+  },{capture:true,passive:false});
+  const endTouch=()=>{if(touch)touch.wrap.classList.remove('is-dragging');touch=null;};
+  document.addEventListener('touchend',endTouch,{capture:true,passive:true});
+  document.addEventListener('touchcancel',endTouch,{capture:true,passive:true});
+  document.addEventListener('mousedown',e=>{
+    if(e.button!==0)return;
+    const wrap=e.target.closest && e.target.closest('#delegateDashboard .delegate-table-scroll');
+    if(wrap) mouse={wrap,x:e.clientX,left:wrap.scrollLeft,active:false};
+  },true);
+  document.addEventListener('mousemove',e=>{
+    if(!mouse)return;
+    const dx=e.clientX-mouse.x;
+    if(!mouse.active && Math.abs(dx)>4){mouse.active=true;mouse.wrap.classList.add('is-dragging');}
+    if(mouse.active){mouse.wrap.scrollLeft=mouse.left-dx;e.preventDefault();}
+  },true);
+  const endMouse=()=>{if(mouse)mouse.wrap.classList.remove('is-dragging');mouse=null;};
+  document.addEventListener('mouseup',endMouse,true);
+  document.addEventListener('mouseleave',endMouse,true);
+  // Ensure first render and every later delegate screen redraw is covered.
+  const originalRender=window.renderDelegateView;
+  if(typeof originalRender==='function' && !originalRender.__scrollPatched){
+    const wrapped=function(){const result=originalRender.apply(this,arguments);setTimeout(wrapTables,0);return result;};
+    wrapped.__scrollPatched=true; window.renderDelegateView=wrapped;
+  }
+})();
+
 </script>
 </body>
 </html>
