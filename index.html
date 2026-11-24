@@ -438,7 +438,8 @@
     .customer-search-result small{display:block;color:#64748b;font-size:.74rem}
     .customer-map-link{display:inline-flex;align-items:center;justify-content:center;gap:5px;flex:0 0 auto;padding:7px 10px;border-radius:9px;background:#eaf7ef;color:#166534;text-decoration:none;font-size:.8rem;font-weight:800;border:1px solid #bbebcc}
     .customer-map-link:hover{background:#dcfce7}
-    @media(max-width:520px){.customer-search-result{align-items:flex-start}.customer-map-link{padding:7px 8px}}
+    .customer-search-result>div:last-child{flex-shrink:0}
+    @media(max-width:520px){.customer-search-result{align-items:flex-start;flex-wrap:wrap}.customer-search-result>div:last-child{width:100%;justify-content:flex-start}.customer-map-link{padding:7px 10px;min-height:36px}}
 
     /* لوحة حالة اتصال الكادر */
     .admin-presence-panel{border:1px solid #dce8f2!important;background:linear-gradient(145deg,#fff,#f8fbff)!important}
@@ -1129,6 +1130,9 @@
         <div class="card" style="border: 2px solid #0284c7; background: #f0f9ff;">
           <h3 style="color: #0284c7;">🧾 سند قبض دفعة نقدية (تسديد دين سابق أثناء التوصيل)</h3>
           <form onsubmit="createDriverReceiptVoucher(event)">
+            <label>ابحث عن الزبون / المحل:</label>
+            <input type="search" id="driverCustomerSearchInput" placeholder="اكتب اسم الزبون أو الماركت أو الهاتف..." oninput="filterDriverCustomerSearch()" style="width:100%;margin-bottom:7px;">
+            <div id="driverCustomerSearchResults" class="customer-search-results" aria-live="polite"></div>
             <label>اختر الزبون / المحل:</label>
             <select id="driverReceiptCustomerSelect" required style="width: 100%; padding: 8px; margin-bottom: 8px;"><option value="">اختر الزبون...</option></select>
             <label>المبلغ المستلم (د.ع):</label>
@@ -4713,7 +4717,7 @@ html,body,#app,.app-shell,.main-content,.view-section,.card,
     function customerMapButton(customerId) {
       const customer = getCustomerById(customerId);
       if (!customer || !customer.gps) return '<span style="color:#94a3b8;font-size:.75rem;">لا يوجد موقع</span>';
-      return `<button type="button" class="customer-map-link" onclick="openCustomerMap('${String(customer.id).replace(/'/g, '')}')">📍 الموقع</button>`;
+      return `<button type="button" class="customer-map-link" aria-label="فتح موقع ${String(customer.name || 'العميل').replace(/&/g, '&amp;').replace(/"/g, '&quot;')}" onclick="openCustomerMap('${String(customer.id).replace(/'/g, '')}')">🗺️ فتح الموقع</button>`;
     }
 
     function renderCustomerSearchResults(filter = '') {
@@ -4784,8 +4788,62 @@ html,body,#app,.app-shell,.main-content,.view-section,.card,
     function renderReceiptCustomerDropdown() {
       const select = document.getElementById('receiptCustomerSelect');
       if(select) select.innerHTML = '<option value="">اختر الزبون...</option>' + state.customers.map(c => `<option value="${c.id}">${c.name} - محل: (${c.storeName || 'بدون'})</option>`).join('');
-      const driverSelect = document.getElementById('driverReceiptCustomerSelect');
-      if(driverSelect) driverSelect.innerHTML = '<option value="">اختر الزبون...</option>' + state.customers.map(c => `<option value="${c.id}">${c.name} - محل: (${c.storeName || 'بدون'})</option>`).join('');
+      renderDriverCustomerOptions();
+    }
+
+    // بحث السائق عن الزبائن مع زر مباشر لفتح موقع العميل على خرائط Google.
+    function filterDriverCustomerSearch() {
+      const input = document.getElementById('driverCustomerSearchInput');
+      const box = document.getElementById('driverCustomerSearchResults');
+      if (!input || !box) return;
+      const query = String(input.value || '').trim().toLowerCase();
+      if (!query) { box.innerHTML = ''; return; }
+      const candidates = (state.customers || []).filter(customer => {
+        const name = String(customer.name || '').toLowerCase();
+        const store = String(customer.storeName || '').toLowerCase();
+        const phone = String(customer.phone || '').toLowerCase();
+        return name.includes(query) || store.includes(query) || phone.includes(query);
+      }).slice(0, 12);
+      if (!candidates.length) {
+        box.innerHTML = '<div class="muted-note">لا توجد نتائج مطابقة.</div>';
+        return;
+      }
+      box.innerHTML = candidates.map(customer => `
+        <div class="customer-search-result">
+          <div class="customer-search-meta">
+            <strong>${customerLedgerEscape(customer.name || 'بدون اسم')} — ${customerLedgerEscape(customer.storeName || 'بدون اسم محل')}</strong>
+            <small>${customerLedgerEscape(customer.phone || 'بدون هاتف')}</small>
+          </div>
+          <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+            <button type="button" class="btn-primary" style="padding:7px 10px;font-size:.78rem;" onclick="selectDriverReceiptCustomer('${String(customer.id).replace(/'/g, '')}')">اختيار</button>
+            ${customerMapButton(customer.id)}
+          </div>
+        </div>`).join('');
+    }
+
+    function selectDriverReceiptCustomer(customerId) {
+      const select = document.getElementById('driverReceiptCustomerSelect');
+      if (!select) return;
+      select.value = String(customerId);
+      if (select.value !== String(customerId)) {
+        renderDriverCustomerOptions();
+        select.value = String(customerId);
+      }
+      if (select.value === String(customerId)) {
+        const input = document.getElementById('driverCustomerSearchInput');
+        const box = document.getElementById('driverCustomerSearchResults');
+        if (input) input.value = '';
+        if (box) box.innerHTML = '';
+      }
+    }
+
+    function renderDriverCustomerOptions() {
+      const select = document.getElementById('driverReceiptCustomerSelect');
+      if (!select) return;
+      const selected = select.value;
+      select.innerHTML = '<option value="">اختر الزبون...</option>' +
+        (state.customers || []).map(customer => `<option value="${customer.id}">${customerLedgerEscape(customer.name || '')} - محل: (${customerLedgerEscape(customer.storeName || 'بدون')})</option>`).join('');
+      if (selected) select.value = selected;
     }
 
     function renderReturnProductDropdown() {
