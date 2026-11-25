@@ -279,7 +279,7 @@
       #receiptPaperContainer > div, #customerStatementPaper > div { break-inside:avoid; page-break-inside:avoid; }
       #invoicePaperContainer tr, #receiptPaperContainer tr, #customerStatementPaper tr { break-inside:avoid; page-break-inside:avoid; }
       #invoicePaperContainer .inv-logo { max-width:60pt!important; max-height:60pt!important; }
-      #invoicePaperContainer #invoiceQrCanvas { max-width:80pt!important; max-height:80pt!important; }
+      #invoicePaperContainer #invoiceQrCanvas { max-width:72pt!important; max-height:72pt!important; }
       #invoicePaperContainer .inv-footer, #receiptPaperContainer .inv-footer, .no-print { display:none!important; }
       #invoicePaperContainer p, #receiptPaperContainer p { overflow-wrap:anywhere!important; }
       * { -webkit-print-color-adjust:exact!important; print-color-adjust:exact!important; }
@@ -579,111 +579,6 @@
       #staffProfileContent .staff-profile-table-scroll th,
       #staffProfileContent .staff-profile-table-scroll td{min-width:145px!important}
     }
-/* A4 compact invoice table and clean invoice preview (no swipe instruction) */
-#printInvoiceModal #invoicePaperContainer .inv-table{
-  width:100%!important;min-width:0!important;max-width:100%!important;
-  table-layout:fixed!important;direction:rtl!important;overflow:visible!important;
-  line-height:1.05!important;border-collapse:collapse!important;
-}
-#printInvoiceModal #invoicePaperContainer .inv-table th,
-#printInvoiceModal #invoicePaperContainer .inv-table td{
-  min-width:0!important;max-width:none!important;padding:2px 3px!important;
-  font-size:10px!important;line-height:1.1!important;white-space:normal!important;
-  overflow-wrap:anywhere!important;word-break:normal!important;
-}
-#printInvoiceModal #invoicePaperContainer .mobile-swipe-hint,
-#printInvoiceModal #invoicePaperContainer .staff-profile-swipe-hint,
-#printInvoiceModal #invoicePaperContainer .delegate-table-swipe-hint,
-#printInvoiceModal #invoicePaperContainer .table-swipe-hint{display:none!important}
-/* Fit invoice information fields inside the selected paper width */
-#printInvoiceModal #invoicePaperContainer .inv-details{
-  display:flex!important;flex-wrap:wrap!important;align-items:flex-start!important;
-  width:100%!important;max-width:100%!important;min-width:0!important;gap:6px!important;
-}
-#printInvoiceModal #invoicePaperContainer .inv-details>div:first-child{
-  flex:1 1 0!important;min-width:0!important;max-width:calc(100% - 82px)!important;
-}
-#printInvoiceModal #invoicePaperContainer .inv-details>div:last-child{
-  flex:0 0 76px!important;width:76px!important;max-width:76px!important;min-width:0!important;
-}
-#printInvoiceModal #invoicePaperContainer .inv-details p{
-  width:100%!important;max-width:100%!important;min-width:0!important;
-  white-space:normal!important;overflow-wrap:anywhere!important;word-break:break-word!important;
-  line-height:1.25!important;
-}
-#printInvoiceModal #invoicePaperContainer #invDelegateName,
-#printInvoiceModal #invoicePaperContainer #invPaymentTypeBadge{
-  color:#dc2626!important;font-weight:700!important;
-}
-#printInvoiceModal #invoicePaperContainer .inv-table{
-  width:100%!important;max-width:100%!important;min-width:0!important;table-layout:fixed!important;
-  border-collapse:collapse!important;
-}
-#printInvoiceModal #invoicePaperContainer .inv-table th,
-#printInvoiceModal #invoicePaperContainer .inv-table td{
-  border:1px solid #777!important;vertical-align:middle!important;
-}
-#printInvoiceModal #invoicePaperContainer .inv-table th:first-child,
-#printInvoiceModal #invoicePaperContainer .inv-table td:first-child{width:25%!important;text-align:right!important;}
-#printInvoiceModal #invoicePaperContainer .inv-table th:nth-child(2),
-#printInvoiceModal #invoicePaperContainer .inv-table td:nth-child(2){width:5%!important;text-align:center!important;white-space:nowrap!important;}
-#printInvoiceModal #invoicePaperContainer .inv-table th:nth-child(3),
-#printInvoiceModal #invoicePaperContainer .inv-table td:nth-child(3),
-#printInvoiceModal #invoicePaperContainer .inv-table th:nth-child(4),
-#printInvoiceModal #invoicePaperContainer .inv-table td:nth-child(4){width:15%!important;text-align:center!important;}
-#printInvoiceModal #invoicePaperContainer .inv-table tr{height:auto!important;}
-
-</style>
-
-<style id="invoice-table-final-tight-layout">
-/* Final invoice table layout: compact, aligned columns with no oversized blank cells */
-#printInvoiceModal #invoicePaperContainer .inv-table,
-#invoicePaperContainer .inv-table {
-  display:table !important; width:100% !important; min-width:0 !important; max-width:100% !important;
-  box-sizing:border-box !important; table-layout:fixed !important; direction:rtl !important;
-  border-collapse:collapse !important; border-spacing:0 !important; margin:8px 0 0 !important;
-}
-#printInvoiceModal #invoicePaperContainer .inv-table th,
-#printInvoiceModal #invoicePaperContainer .inv-table td,
-#invoicePaperContainer .inv-table th,
-#invoicePaperContainer .inv-table td {
-  box-sizing:border-box !important; min-width:0 !important; max-width:none !important;
-  border:1px solid #666 !important; padding:3px 4px !important;
-  vertical-align:middle !important; line-height:1.2 !important;
-  white-space:normal !important; overflow-wrap:anywhere !important; word-break:normal !important;
-}
-/* RTL order: product/flavour, quantity, carton price, total */
-#printInvoiceModal #invoicePaperContainer .inv-table th:nth-child(1),
-#printInvoiceModal #invoicePaperContainer .inv-table td:nth-child(1),
-#invoicePaperContainer .inv-table th:nth-child(1),
-#invoicePaperContainer .inv-table td:nth-child(1) { width:25% !important; text-align:right !important; }
-#printInvoiceModal #invoicePaperContainer .inv-table th:nth-child(2),
-#printInvoiceModal #invoicePaperContainer .inv-table td:nth-child(2),
-#invoicePaperContainer .inv-table th:nth-child(2),
-#invoicePaperContainer .inv-table td:nth-child(2) { width:5% !important; text-align:center !important; white-space:nowrap !important; }
-#printInvoiceModal #invoicePaperContainer .inv-table th:nth-child(3),
-#printInvoiceModal #invoicePaperContainer .inv-table td:nth-child(3),
-#invoicePaperContainer .inv-table th:nth-child(3),
-#invoicePaperContainer .inv-table td:nth-child(3),
-#printInvoiceModal #invoicePaperContainer .inv-table th:nth-child(4),
-#printInvoiceModal #invoicePaperContainer .inv-table td:nth-child(4),
-#invoicePaperContainer .inv-table th:nth-child(4),
-#invoicePaperContainer .inv-table td:nth-child(4) { width:15% !important; text-align:center !important; }
-/* Requested A4 invoice typography: 14pt across all table columns */
-#printInvoiceModal #invoicePaperContainer .inv-table th,
-#printInvoiceModal #invoicePaperContainer .inv-table td,
-#invoicePaperContainer .inv-table th,
-#invoicePaperContainer .inv-table td { font-size:12pt !important; }
-#printInvoiceModal #invoicePaperContainer .inv-table tr,
-#invoicePaperContainer .inv-table tr { height:auto !important; }
-</style>
-
-<style id="invoice-all-text-12pt">
-/* Requested: all invoice content uses 12pt. */
-#printInvoiceModal #invoicePaperContainer:not(.no-print),
-#invoicePaperContainer { font-size:12pt!important; }
-#printInvoiceModal #invoicePaperContainer *:not(canvas):not(img):not(button),
-#invoicePaperContainer *:not(canvas):not(img):not(button) { font-size:12pt!important; }
 </style>
 </head>
 <body>
@@ -711,7 +606,7 @@
         <button type="button" class="btn-role" data-role="driver" aria-pressed="false" onclick="switchRoleTab('driver', this)">سائق توصيل</button>
       </div>
 
-      <form id="loginForm" data-selected-role="admin" onsubmit="handleLogin(event)">
+      <form id="loginForm" onsubmit="handleLogin(event)">
         <input type="email" id="usernameInput" placeholder="البريد الإلكتروني المسجل في Firebase" autocomplete="username" required>
         <input type="password" id="passwordInput" placeholder="الرمز / كلمة المرور" autocomplete="current-password" required>
         <button type="submit" class="btn-primary full-width">دخول للنظام</button>
@@ -1496,7 +1391,6 @@
         طربوش باب الآغا… قرمشة تجمعنا، وثقة تدوم بيننا.
       </div>
       <div class="inv-footer no-print" style="margin-top: 20px; display: flex; gap: 10px; flex-wrap: wrap;">
-        <button class="btn-primary" style="background:#1d4ed8;" onclick="printInvoiceA4()">🖨️ طباعة عادية A4 كاملة</button>
         <button class="btn-primary" onclick="printThermalBluetooth()">🖨️ طباعة حرارية (بلوتوث/POS)</button>
         <button class="btn-success" onclick="downloadInvoicePDF()">📥 تحميل PDF</button>
         <button class="btn-share" onclick="shareOrderWhatsAppAdvanced(window.currentPrintOrderId)">📤 مشاركة واتساب</button>
@@ -2697,10 +2591,8 @@ try {
       const originalButtonText = submitButton ? submitButton.innerHTML : '';
       const identity = document.getElementById('usernameInput').value.trim().toLowerCase();
       const password = document.getElementById('passwordInput').value;
+      const expectedRole = (document.getElementById('loginForm')?.dataset.selectedRole) || state.selectedRole || 'admin';
       const roleLabels = { admin: 'المدير', delegate: 'مندوب مبيعات', driver: 'سائق توصيل' };
-      const formRole = document.getElementById('loginForm')?.dataset.selectedRole;
-      const expectedRole = ['admin', 'delegate', 'driver'].includes(formRole) ? formRole :
-        (['admin', 'delegate', 'driver'].includes(state.selectedRole) ? state.selectedRole : 'admin');
       const status = document.getElementById('sessionRestoreStatus');
 
       if (!auth) {
@@ -2758,11 +2650,7 @@ try {
           'auth/wrong-password': 'كلمة المرور غير صحيحة.',
           'auth/invalid-email': 'صيغة البريد الإلكتروني غير صحيحة.',
           'auth/too-many-requests': 'تم إيقاف المحاولات مؤقتاً لكثرة المحاولات. حاول لاحقاً.',
-          'auth/network-request-failed': 'تعذر الاتصال بالإنترنت. تحقق من الشبكة ثم حاول مجدداً.',
-          'auth/operation-not-allowed': 'تسجيل الدخول بالبريد وكلمة المرور غير مفعّل في إعدادات Firebase Authentication.',
-          'auth/invalid-api-key': 'مفتاح Firebase غير صحيح؛ راجع إعدادات المشروع داخل الكود.',
-          'auth/app-not-authorized': 'هذا النطاق غير مسموح له باستخدام Firebase. أضف النطاق إلى Authorized domains.',
-          'auth/user-disabled': 'هذا الحساب معطّل في Firebase Authentication.'
+          'auth/network-request-failed': 'تعذر الاتصال بالإنترنت.'
         };
         if (status) { status.textContent = messages[error.code] || 'تعذر تسجيل الدخول. تحقق من الاتصال والبيانات ثم حاول مجدداً.'; status.dataset.state = 'error'; }
         alert(messages[error.code] || `تعذر تسجيل الدخول: ${error.message || 'خطأ غير معروف'}`);
@@ -4446,71 +4334,6 @@ html,body,#app,.app-shell,.main-content,.view-section,.card,
   #delegateDashboard .delegate-table-scroll th,
   #delegateDashboard .delegate-table-scroll td{min-width:145px!important}
 }
-
-/* FINAL: full invoice details in the open-invoice preview; never clip content */
-#printInvoiceModal{
-  position:fixed!important;inset:0!important;z-index:9999!important;
-  display:flex!important;flex-direction:column!important;align-items:center!important;
-  justify-content:flex-start!important;gap:0!important;
-  width:100vw!important;height:100vh!important;height:100dvh!important;
-  max-width:100vw!important;max-height:100vh!important;max-height:100dvh!important;
-  padding:14px!important;overflow-x:hidden!important;overflow-y:auto!important;
-  box-sizing:border-box!important;
-}
-#printInvoiceModal.hidden{display:none!important}
-#printInvoiceModal #invoicePaperContainer{
-  display:block!important;position:relative!important;flex:0 0 auto!important;
-  width:min(794px,100%)!important;max-width:794px!important;min-width:0!important;
-  height:auto!important;min-height:0!important;max-height:none!important;
-  margin:0 auto 18px!important;padding:24px!important;
-  overflow:visible!important;box-sizing:border-box!important;
-  background:#fff!important;color:#172033!important;
-}
-#printInvoiceModal #invoicePaperContainer.size-a4{
-  width:min(794px,100%)!important;max-width:794px!important;font-size:16px!important;
-}
-#printInvoiceModal #invoicePaperContainer.size-a5{
-  width:min(560px,100%)!important;max-width:560px!important;font-size:14px!important;padding:20px!important;
-}
-#printInvoiceModal #invoicePaperContainer.size-pos{
-  width:min(304px,100%)!important;max-width:304px!important;font-size:12px!important;padding:12px!important;
-}
-#printInvoiceModal #invoicePaperContainer .inv-header,
-#printInvoiceModal #invoicePaperContainer .inv-details{
-  width:100%!important;max-width:100%!important;min-width:0!important;
-  flex-wrap:wrap!important;overflow:visible!important;
-}
-#printInvoiceModal #invoicePaperContainer .inv-details>div{
-  min-width:0!important;max-width:100%!important;overflow-wrap:anywhere!important;
-}
-#printInvoiceModal #invoicePaperContainer .inv-table{
-  display:table!important;width:100%!important;max-width:100%!important;min-width:0!important;
-  table-layout:fixed!important;border-collapse:collapse!important;direction:rtl!important;
-  overflow:visible!important;
-}
-#printInvoiceModal #invoicePaperContainer .inv-table th,
-#printInvoiceModal #invoicePaperContainer .inv-table td{
-  min-width:0!important;max-width:none!important;white-space:normal!important;
-  overflow-wrap:anywhere!important;word-break:normal!important;padding:7px!important;
-}
-#printInvoiceModal #invoicePaperContainer .inv-total,
-#printInvoiceModal #invoicePaperContainer #invFooterCustomSlogan{
-  width:100%!important;max-width:100%!important;white-space:normal!important;
-  overflow-wrap:anywhere!important;
-}
-#printInvoiceModal #invoicePaperContainer .inv-logo{max-width:72px!important;max-height:72px!important;object-fit:contain!important}
-#printInvoiceModal #invoicePaperContainer #invoiceQrCanvas{max-width:100px!important;max-height:100px!important}
-@media(max-width:600px){
- #printInvoiceModal{padding:7px!important}
- #printInvoiceModal #invoicePaperContainer,
- #printInvoiceModal #invoicePaperContainer.size-a4,
- #printInvoiceModal #invoicePaperContainer.size-a5,
- #printInvoiceModal #invoicePaperContainer.size-pos{
-   width:100%!important;max-width:100%!important;padding:12px!important;
- }
- #printInvoiceModal #invoicePaperContainer .inv-table th,
- #printInvoiceModal #invoicePaperContainer .inv-table td{font-size:.78em!important;padding:4px!important}
-}
 </style></head><body></body></html>`);
           printWindow.document.close();
           printWindow.document.body.appendChild(clone);
@@ -6144,131 +5967,15 @@ html,body,#app,.app-shell,.main-content,.view-section,.card,
     }
 
     function printInvoiceWithSelectedSize() {
-      const selected = document.getElementById('invoiceSizeSelector')?.value || 'size-a4';
-      printInvoiceInIsolatedWindow(selected);
-    }
-
-    // طباعة عادية مخصصة على ورق A4 مع إظهار كامل الفاتورة عبر صفحات عند الحاجة.
-    function printInvoiceA4() {
-      printInvoiceInIsolatedWindow('size-a4');
-    }
-
-    function printInvoiceInIsolatedWindow(requestedSize) {
-      const allowed = ['size-a4','size-a5','size-pos'];
-      const sizeClass = allowed.includes(requestedSize) ? requestedSize : 'size-a4';
-      const source = document.getElementById('invoicePaperContainer');
-      if (!source) return alert('تعذر العثور على الفاتورة للطباعة.');
-      const printWindow = window.open('', '_blank', 'width=1000,height=800');
-      if (!printWindow) return alert('المتصفح منع نافذة الطباعة. اسمح بالنوافذ المنبثقة ثم أعد المحاولة.');
-
-      const clone = source.cloneNode(true);
-      clone.className = 'invoice-paper ' + sizeClass;
-      clone.removeAttribute('id');
-      clone.querySelectorAll('.no-print, .inv-footer, .mobile-swipe-hint, .staff-profile-swipe-hint, .delegate-table-swipe-hint, .table-swipe-hint').forEach(node => node.remove());
-      // Remove any instructional text nodes about swiping from the invoice only.
-      clone.querySelectorAll('*').forEach(node => {
-        if (node.children.length === 0 && /اسحب.{0,30}(يمين|يسار)|(يمين|يسار).{0,30}اسحب/.test(node.textContent || '')) node.remove();
-      });
-
-      // Preserve the live QR as an image; never copy the blank canvas bitmap.
-      const liveQr = document.getElementById('invoiceQrCanvas');
-      const clonedQr = clone.querySelector('#invoiceQrCanvas');
-      if (liveQr && clonedQr) {
-        try {
-          const qrImage = document.createElement('img');
-          qrImage.src = liveQr.toDataURL('image/png');
-          qrImage.alt = 'رمز موقع الزبون';
-          qrImage.className = 'invoice-qr-image';
-          clonedQr.replaceWith(qrImage);
-        } catch (_) {
-          clonedQr.replaceWith(Object.assign(document.createElement('div'), {textContent:'رمز الموقع غير متاح'}));
-        }
-      }
-
-      // Explicit column widths prevent the last/left column from being clipped.
-      const table = clone.querySelector('.inv-table');
-      if (table) {
-        table.style.width = '100%';
-        table.style.maxWidth = '100%';
-        table.style.tableLayout = 'fixed';
-        table.style.direction = 'rtl';
-        const colgroup = document.createElement('colgroup');
-        const columnWidths = sizeClass === 'size-a4'
-          ? ['25%','5%','15%','15%']
-          : ['25%','5%','15%','15%'];
-        columnWidths.forEach(width => {
-          const col = document.createElement('col');
-          col.style.width = width;
-          colgroup.appendChild(col);
-        });
-        table.insertBefore(colgroup, table.firstChild);
-      }
-
-      const page = {
-        'size-a4': {rule:'A4 portrait', width:'194mm', font:'12pt', pad:'0'},
-        'size-a5': {rule:'A5 portrait', width:'136mm', font:'12pt', pad:'0'},
-        'size-pos': {rule:'80mm auto', width:'76mm', font:'12pt', pad:'0'}
-      }[sizeClass];
-
-      const css = `
-        @page{size:${page.rule};margin:${sizeClass==='size-pos'?'2mm':'8mm'}}
-        *{box-sizing:border-box!important;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
-        html,body{margin:0!important;padding:0!important;width:100%!important;min-width:0!important;height:auto!important;min-height:0!important;overflow:visible!important;background:#fff!important;color:#111!important}
-        body{font-family:Arial,Tahoma,sans-serif!important;direction:rtl!important}
-        .invoice-paper{display:block!important;position:static!important;float:none!important;width:${page.width}!important;max-width:${page.width}!important;min-width:0!important;height:auto!important;min-height:0!important;max-height:none!important;margin:0 auto!important;padding:${page.pad}!important;overflow:visible!important;border:0!important;border-radius:0!important;box-shadow:none!important;background:#fff!important;color:#111!important;font-size:12pt!important;line-height:1.35!important;direction:rtl!important}
-        .invoice-paper *:not(canvas):not(img){font-size:12pt!important}
-        .inv-header{display:flex!important;flex-direction:row!important;justify-content:space-between!important;align-items:center!important;gap:8px!important;width:100%!important;margin:0 0 8px!important;padding:0 0 6px!important;border-bottom:1px solid #aaa!important;break-inside:avoid!important;page-break-inside:avoid!important}
-        .inv-header img{display:block!important;width:auto!important;max-width:54px!important;max-height:54px!important;object-fit:contain!important}
-        .inv-header h2{font-size:1.45em!important;margin:0 0 3px!important}
-        .inv-header p{margin:1px 0!important;font-size:.9em!important}
-        .inv-details{display:flex!important;flex-direction:row!important;justify-content:space-between!important;align-items:flex-start!important;gap:6px!important;width:100%!important;max-width:100%!important;min-width:0!important;margin:5px 0 8px!important;break-inside:avoid!important;page-break-inside:avoid!important}
-        .inv-details>div:first-child{flex:1 1 0!important;width:auto!important;min-width:0!important;max-width:calc(100% - 90px)!important;overflow:visible!important}
-        .inv-details>div:last-child{flex:0 0 84px!important;width:84px!important;max-width:84px!important;min-width:0!important}
-        .inv-details p{display:block!important;width:100%!important;max-width:100%!important;min-width:0!important;margin:2px 0!important;line-height:1.25!important;white-space:normal!important;overflow-wrap:anywhere!important;word-break:break-word!important}
-        .inv-details p span,.inv-details p strong{white-space:normal!important;overflow-wrap:anywhere!important;word-break:break-word!important}
-        #invDelegateName,#invPaymentTypeBadge{color:#dc2626!important;font-weight:700!important}
-        .invoice-qr-image{display:block!important;width:78px!important;height:78px!important;max-width:100%!important;object-fit:contain!important;margin:0 auto!important}
-        .inv-table{display:table!important;width:100%!important;max-width:100%!important;min-width:0!important;margin:3px 0 1px!important;border-collapse:collapse!important;table-layout:fixed!important;direction:rtl!important;break-inside:auto!important;page-break-inside:auto!important}
-        .inv-table thead{display:table-header-group!important}
-        .inv-table tbody{display:table-row-group!important}
-        .inv-table tr{break-inside:avoid!important;page-break-inside:avoid!important}
-        .inv-table th,.inv-table td{display:table-cell!important;min-width:0!important;max-width:none!important;padding:${sizeClass==='size-pos'?'2px':(sizeClass==='size-a4'?'1px':'3px')}!important;border:1px solid #777!important;border-bottom:1.5px solid #555!important;text-align:right!important;vertical-align:middle!important;white-space:normal!important;overflow:visible!important;overflow-wrap:anywhere!important;word-break:normal!important;font-size:inherit!important}
-        .inv-table{line-height:${sizeClass==='size-a4'?'1.05':'1.3'}!important}
-        .inv-table th,.inv-table td{font-size:12pt!important}
-        .inv-table th:first-child,.inv-table td:first-child{text-align:right!important}
-        .inv-table th:nth-child(2),.inv-table td:nth-child(2){text-align:center!important;white-space:nowrap!important;font-size:12pt!important}
-        .inv-total{margin:2px 0!important}
-        .inv-total{display:block!important;width:100%!important;margin:8px 0!important;text-align:right!important;break-inside:avoid!important;page-break-inside:avoid!important}
-        .inv-total h3{font-size:1.25em!important;margin:4px 0!important}
-        .inv-total p{margin:3px 0!important;overflow-wrap:anywhere!important}
-        #invFooterCustomSlogan{display:block!important;margin-top:8px!important;padding-top:6px!important;border-top:1px dashed #bbb!important;text-align:center!important;font-weight:bold!important;break-inside:avoid!important;page-break-inside:avoid!important}
-        hr{border:0!important;border-top:1px solid #aaa!important}
-        p,span,strong,small,div{overflow-wrap:anywhere}
-        @media screen{body{padding:15px!important;background:#e5e7eb!important}.invoice-paper{padding:8mm!important;background:#fff!important;box-shadow:0 1px 8px #999!important}}
-      `;
-
-      printWindow.document.open();
-      printWindow.document.write('<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>طباعة الفاتورة</title><style>' + css + '</style></head><body>' + clone.outerHTML + '</body></html>');
-      printWindow.document.close();
-
-      let started = false;
-      const startPrint = () => {
-        if (started || printWindow.closed) return;
-        started = true;
-        setTimeout(() => {
-          try { printWindow.focus(); printWindow.print(); }
-          catch (error) { alert('تعذرت الطباعة: ' + error.message); }
-        }, 350);
-      };
-      printWindow.onload = startPrint;
-      setTimeout(startPrint, 1200);
+      prepareInvoicePrint();
+      window.print();
     }
 
     function printThermalBluetooth() {
-      const selector = document.getElementById('invoiceSizeSelector');
-      if (selector) selector.value = 'size-pos';
+      document.getElementById('invoiceSizeSelector').value = 'size-pos';
       changeInvoiceSize('size-pos');
-      printInvoiceInIsolatedWindow('size-pos');
+      prepareInvoicePrint();
+      window.print();
     }
 
     function formatIraqiPhoneForWhatsApp(rawPhone) {
@@ -6356,26 +6063,7 @@ html,body,#app,.app-shell,.main-content,.view-section,.card,
       
       const qrTarget = o.customerGps ? `https://maps.google.com/?q=${o.customerGps}` : `Invoice #${o.id} - ${o.customerName}`;
       QRCode.toCanvas(document.getElementById('invoiceQrCanvas'), qrTarget, { width: 100, margin: 1 });
-      const invoiceModal = document.getElementById('printInvoiceModal');
-      const invoicePaper = document.getElementById('invoicePaperContainer');
-      const sizeSelector = document.getElementById('invoiceSizeSelector');
-      const chosenSize = sizeSelector && ['size-a4','size-a5','size-pos'].includes(sizeSelector.value) ? sizeSelector.value : 'size-a4';
-      if (invoicePaper) {
-        invoicePaper.classList.remove('size-a4','size-a5','size-pos');
-        invoicePaper.classList.add(chosenSize);
-        invoicePaper.style.maxHeight = 'none';
-        invoicePaper.style.height = 'auto';
-        invoicePaper.style.overflow = 'visible';
-        invoicePaper.scrollTop = 0;
-      }
-      if (invoiceModal) {
-        invoiceModal.scrollTop = 0;
-        invoiceModal.classList.remove('hidden');
-        requestAnimationFrame(() => {
-          invoiceModal.scrollTop = 0;
-          if (invoicePaper) invoicePaper.scrollTop = 0;
-        });
-      }
+      document.getElementById('printInvoiceModal').classList.remove('hidden');
     }
 
     function closeInvoiceModal() {
@@ -6468,12 +6156,6 @@ html,body,#app,.app-shell,.main-content,.view-section,.card,
     }, true);
 
     window.onload = function() {
-      // توحيد حالة تبويب الدخول مع النموذج عند أول فتح الصفحة.
-      const loginForm = document.getElementById('loginForm');
-      if (loginForm && !['admin', 'delegate', 'driver'].includes(loginForm.dataset.selectedRole)) {
-        loginForm.dataset.selectedRole = 'admin';
-      }
-      switchRoleTab(loginForm?.dataset.selectedRole || 'admin', document.querySelector('.role-selector .btn-role[data-role="admin"]'));
       installDraggableZoomTools();
       applySystemZoom();
       applySystemBranding();
