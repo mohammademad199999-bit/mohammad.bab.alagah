@@ -2007,7 +2007,7 @@ try {
               <strong class="${data.balance > 0 ? 'ledger-debt' : data.balance < 0 ? 'ledger-credit' : 'ledger-zero'}">${Math.abs(data.balance).toLocaleString('en-US')} د.ع ${data.balance > 0 ? 'مستحق' : data.balance < 0 ? 'رصيد للزبون' : 'مسدد'}</strong>
               <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
                 <button type="button" class="btn-secondary" onclick="selectCustomerAccount('${role}','${String(customer.id).replace(/'/g, '')}')">فتح الحساب</button>
-                ${role === 'admin' ? `<button type="button" class="btn-danger" onclick="deleteCustomerRecord(${Number(customer.id)})">حذف العميل/الماركت</button>` : ''}
+                ${role === 'admin' ? `<button type="button" class="btn-primary" onclick="editCustomerDetails(${JSON.stringify(String(customer.id))})">✏️ تعديل البيانات</button><button type="button" class="btn-danger" onclick="deleteCustomerRecord(${Number(customer.id)})">حذف العميل/الماركت</button>` : ''}
                 ${customerMapButton(customer.id)}
               </div>
             </div>`).join('')}
@@ -3864,7 +3864,7 @@ try {
         let flavorsHtml = (p.flavors || []).map((f, index) => `<div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap;margin:5px 0;padding:5px;background:#f8fafc;border-radius:6px;"><strong>${f.name}</strong><span>${f.stock} كارتون</span><button type="button" class="btn-success" style="padding:3px 8px;" onclick="adjustProductStock(${p.id},${index},'add')">＋</button><button type="button" class="btn-danger" style="padding:3px 8px;" onclick="adjustProductStock(${p.id},${index},'remove')">－</button></div>`).join('') || '<small>لا توجد نكهات مسجلة</small>';
         let stockBadge = p.totalStock <= 10 ? `<br><span class="badge" style="background:#ef4444">⚠️ قرب نفاد المخزن!</span>` : `<br><span class="badge" style="background:#16a34a">متوفر</span>`;
         let totalControls = `<div style="display:flex;gap:5px;align-items:center;margin-top:6px;"><button type="button" class="btn-success" style="padding:3px 9px;" onclick="adjustProductStock(${p.id},-1,'add')">＋ زيادة</button><button type="button" class="btn-danger" style="padding:3px 9px;" onclick="adjustProductStock(${p.id},-1,'remove')">－ نقصان</button></div>`;
-        invBody.innerHTML += `<tr><td>${imgTag}</td><td><strong>${p.name}</strong><br><small style="color:#64748b;">${p.desc || ''}</small></td><td>${p.price.toLocaleString()} د.ع</td><td><strong>${p.totalStock} كارتون</strong>${stockBadge}${totalControls}</td><td>${flavorsHtml}</td><td><div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn-secondary" style="padding:5px 10px;font-size:.8rem" onclick="toggleProduct(${p.id})">${p.active ? 'تعطيل' : 'تفعيل'}</button><button class="btn-danger" style="padding:5px 10px;font-size:.8rem" onclick="deleteProduct(${p.id})">حذف</button></div></td></tr>`;
+        invBody.innerHTML += `<tr><td>${imgTag}</td><td><strong>${p.name}</strong><br><small style="color:#64748b;">${p.desc || ''}</small></td><td>${p.price.toLocaleString()} د.ع</td><td><strong>${p.totalStock} كارتون</strong>${stockBadge}${totalControls}</td><td>${flavorsHtml}</td><td><div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn-primary" style="padding:5px 10px;font-size:.8rem" onclick="editProductDetails(${p.id})">✏️ تعديل كامل</button><button class="btn-secondary" style="padding:5px 10px;font-size:.8rem" onclick="toggleProduct(${p.id})">${p.active ? 'تعطيل' : 'تفعيل'}</button><button class="btn-danger" style="padding:5px 10px;font-size:.8rem" onclick="deleteProduct(${p.id})">حذف</button></div></td></tr>`;
       });
 
       // قائمة إسناد الطلبات للسائقين مع إبراز اسم المندوب القاطع بوضوح
@@ -4958,6 +4958,59 @@ html,body,#app,.app-shell,.main-content,.view-section,.card,
       setupDashboardView();
     }
 
+    function editCustomerDetails(customerId) {
+      if (!isCurrentUserAdmin()) return alert('تعديل معلومات الزبون متاح للمدير فقط.');
+      const customer = getCustomerById(customerId);
+      if (!customer) return alert('لم يتم العثور على الزبون.');
+      const name = prompt('اسم الزبون:', customer.name || ''); if (name === null) return;
+      const storeName = prompt('اسم المحل / الماركت:', customer.storeName || ''); if (storeName === null) return;
+      const phone = prompt('رقم الهاتف:', customer.phone || ''); if (phone === null) return;
+      const address = prompt('العنوان التفصيلي:', customer.address || ''); if (address === null) return;
+      const gps = prompt('إحداثيات GPS (خط العرض، خط الطول):', customer.gps || ''); if (gps === null) return;
+      if (!name.trim() && !storeName.trim()) return alert('يجب إدخال اسم الزبون أو اسم المحل على الأقل.');
+      customer.name = name.trim(); customer.storeName = storeName.trim();
+      customer.phone = phone.trim(); customer.address = address.trim(); customer.gps = gps.trim();
+      customer.updatedAt = new Date().toISOString();
+      customer.updatedBy = state.currentUser.name || 'المدير';
+      saveData();
+      if (typeof renderAdminView === 'function') renderAdminView();
+      if (document.getElementById('adminCustomerLedgerSelect')) renderCustomerAccountsPanel('admin');
+      closeCustomerQuickProfile();
+      alert('تم تحديث معلومات الزبون وحفظها.');
+    }
+
+    function editProductDetails(productId) {
+      if (!isCurrentUserAdmin()) return alert('تعديل المنتجات متاح للمدير فقط.');
+      const product = (state.products || []).find(p => String(p.id) === String(productId));
+      if (!product) return alert('لم يتم العثور على المنتج.');
+      const name = prompt('اسم المنتج:', product.name || ''); if (name === null) return;
+      const desc = prompt('الوصف / الحجم / عدد القطع:', product.desc || ''); if (desc === null) return;
+      const price = prompt('سعر الكارتون بالدينار:', String(product.price ?? 0)); if (price === null) return;
+      const commission = prompt('عمولة الكارتون:', String(product.commission ?? 0)); if (commission === null) return;
+      const minQtyDiscount = prompt('الحد الأدنى للخصم:', String(product.minQtyDiscount ?? 0)); if (minQtyDiscount === null) return;
+      const discountPerCarton = prompt('الخصم لكل كارتون:', String(product.discountPerCarton ?? 0)); if (discountPerCarton === null) return;
+      const flavorText = (product.flavors || []).map(f => `${f.name}|${f.stock}`).join('\n');
+      const flavorsInput = prompt('النكهات — كل سطر بالشكل: اسم النكهة|عدد الكراتين\nيمكنك إضافة أو حذف أو تعديل النكهات:', flavorText);
+      if (flavorsInput === null) return;
+      const num = v => Number(String(v).replace(/,/g,'').trim());
+      const vals = [price, commission, minQtyDiscount, discountPerCarton].map(num);
+      if (!name.trim() || vals.some(v => !Number.isFinite(v) || v < 0)) return alert('تحقق من اسم المنتج والأسعار والعمولات والخصومات.');
+      const flavors = [];
+      for (const line of flavorsInput.split(/\r?\n/).map(x=>x.trim()).filter(Boolean)) {
+        const parts = line.split('|'); const fname = (parts.shift() || '').trim(); const qty = num(parts.join('|'));
+        if (!fname || !Number.isFinite(qty) || qty < 0) return alert('صيغة النكهة غير صحيحة. استخدم: اسم النكهة|عدد الكراتين');
+        flavors.push({name:fname, stock:qty});
+      }
+      product.name=name.trim(); product.desc=desc.trim(); product.price=vals[0];
+      product.commission=vals[1]; product.minQtyDiscount=vals[2]; product.discountPerCarton=vals[3];
+      product.flavors=flavors;
+      product.totalStock=flavors.length ? flavors.reduce((sum,f)=>sum+Number(f.stock||0),0) : Number(product.totalStock||0);
+      product.updatedAt=new Date().toISOString(); product.updatedBy=state.currentUser.name || 'المدير';
+      saveData(); renderAdminView();
+      pushNotification('delegate','تحديث بيانات منتج',`قام المدير بتحديث بيانات المنتج: ${product.name}`);
+      alert('تم تحديث بيانات المنتج والنكهات والمخزون وحفظها.');
+    }
+
     function deleteProduct(productId) {
       const product = (state.products || []).find(p => String(p.id) === String(productId));
       if (!product) return alert('تعذر العثور على المنتج المطلوب.');
@@ -5350,7 +5403,7 @@ html,body,#app,.app-shell,.main-content,.view-section,.card,
               <small>${customerLedgerEscape(customer.phone || 'لا يوجد هاتف')}</small>
               <button type="button" class="customer-quick-map-inline" onclick="openCustomerMap('${String(customer.id).replace(/'/g, '')}')" aria-label="${customer.gps ? 'فتح موقع الزبون في خرائط Google' : 'طلب إذن الموقع وتحديد موقع الزبون'}">${gpsLabel} <span aria-hidden="true">↗</span></button>
             </div>
-            <div class="customer-quick-edit">✎</div>
+            ${state.currentUser && state.currentUser.role === 'admin' ? `<button type="button" class="customer-quick-edit" onclick="editCustomerDetails(${JSON.stringify(String(customer.id))})">✎</button>` : '<div class="customer-quick-edit">✎</div>'}
           </div>
           <div class="customer-quick-actions">
             <button type="button" onclick="alert('الرصيد الحالي: ${Math.abs(data.balance).toLocaleString('en-US')} د.ع — ${balanceLabel}')">▣　إظهار الرصيد</button>
