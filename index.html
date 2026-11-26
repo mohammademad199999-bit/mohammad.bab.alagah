@@ -685,6 +685,27 @@
 #printInvoiceModal #invoicePaperContainer *:not(canvas):not(img):not(button),
 #invoicePaperContainer *:not(canvas):not(img):not(button) { font-size:12pt!important; }
 </style>
+<style>
+
+    /* نوافذ التعديل الاحترافية */
+    .editor-modal{position:fixed;inset:0;z-index:100500;background:rgba(15,23,42,.68);backdrop-filter:blur(5px);display:flex;align-items:center;justify-content:center;padding:16px;direction:rtl}
+    .editor-panel{width:min(860px,100%);max-height:min(92vh,950px);overflow:auto;background:#fff;border-radius:20px;box-shadow:0 25px 80px rgba(0,0,0,.3);border:1px solid #dbeafe}
+    .editor-head{position:sticky;top:0;z-index:2;background:linear-gradient(135deg,#0f2742,#075985);color:#fff;padding:19px 24px;display:flex;align-items:center;justify-content:space-between;gap:12px}
+    .editor-head h2{font-size:1.18rem;margin:0}.editor-head p{font-size:.82rem;opacity:.85;margin-top:4px}
+    .editor-close{background:rgba(255,255,255,.16);color:#fff;width:38px;height:38px;font-size:1.3rem;border-radius:10px;flex-shrink:0}
+    .editor-body{padding:22px 24px}.editor-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:15px}
+    .editor-field{min-width:0}.editor-field.full{grid-column:1/-1}.editor-field label{display:block;font-size:.88rem;font-weight:800;color:#334155;margin-bottom:6px}
+    .editor-field input,.editor-field textarea,.editor-field select{width:100%;border:1px solid #cbd5e1;border-radius:10px;padding:11px 12px;background:#f8fafc;color:#0f172a;font:inherit;outline:none;min-height:44px}
+    .editor-field textarea{min-height:82px;resize:vertical}.editor-field input:focus,.editor-field textarea:focus{border-color:#0284c7;box-shadow:0 0 0 3px rgba(2,132,199,.12);background:#fff}
+    .editor-section{margin-top:22px;padding-top:18px;border-top:1px solid #e2e8f0}.editor-section h3{font-size:1rem;color:#0f2742;margin-bottom:12px}
+    .flavor-editor-row{display:grid;grid-template-columns:minmax(0,1fr) 150px 42px;gap:9px;margin-bottom:9px;align-items:center}
+    .flavor-editor-row input{width:100%;min-width:0;border:1px solid #cbd5e1;border-radius:9px;padding:10px;font:inherit;background:#f8fafc}
+    .editor-actions{position:sticky;bottom:0;background:#fff;border-top:1px solid #e2e8f0;padding:15px 24px;display:flex;gap:10px;justify-content:flex-start;flex-wrap:wrap}
+    .editor-actions button{min-width:125px;padding:11px 18px}.editor-hint{font-size:.78rem;color:#64748b;margin-top:6px}
+    .editor-save-status{font-size:.85rem;color:#0369a1;margin-left:auto;align-self:center}
+    @media(max-width:620px){.editor-modal{padding:5px;align-items:flex-start}.editor-panel{max-height:calc(100dvh - 10px);border-radius:14px}.editor-head{padding:14px 16px}.editor-body{padding:16px}.editor-grid{grid-template-columns:1fr;gap:10px}.editor-field.full{grid-column:auto}.flavor-editor-row{grid-template-columns:minmax(0,1fr) 100px 38px;gap:6px}.editor-actions{padding:12px 16px}.editor-actions button{flex:1;min-width:0}}
+
+</style>
 </head>
 <body>
   <div class="screen-zoom-tools" id="screenZoomTools" aria-label="تكبير وتصغير الشاشة">
@@ -2007,7 +2028,7 @@ try {
               <strong class="${data.balance > 0 ? 'ledger-debt' : data.balance < 0 ? 'ledger-credit' : 'ledger-zero'}">${Math.abs(data.balance).toLocaleString('en-US')} د.ع ${data.balance > 0 ? 'مستحق' : data.balance < 0 ? 'رصيد للزبون' : 'مسدد'}</strong>
               <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
                 <button type="button" class="btn-secondary" onclick="selectCustomerAccount('${role}','${String(customer.id).replace(/'/g, '')}')">فتح الحساب</button>
-                ${role === 'admin' ? `<button type="button" class="btn-primary" onclick="editCustomerDetails(${JSON.stringify(String(customer.id))})">✏️ تعديل البيانات</button><button type="button" class="btn-danger" onclick="deleteCustomerRecord(${Number(customer.id)})">حذف العميل/الماركت</button>` : ''}
+                ${role === 'admin' ? `<button type="button" class="btn-primary" data-customer-id="${String(customer.id).replace(/&/g, '&amp;').replace(/"/g, '&quot;')}" onclick="editCustomerDetails(this.dataset.customerId)">✏️ تعديل البيانات</button><button type="button" class="btn-danger" onclick="deleteCustomerRecord(${Number(customer.id)})">حذف العميل/الماركت</button>` : ''}
                 ${customerMapButton(customer.id)}
               </div>
             </div>`).join('')}
@@ -4958,57 +4979,132 @@ html,body,#app,.app-shell,.main-content,.view-section,.card,
       setupDashboardView();
     }
 
+    function closeRecordEditor() {
+      const root = document.getElementById('recordEditorModal');
+      if (root) root.remove();
+      document.body.style.overflow = '';
+    }
+
+    function openRecordEditor(title, subtitle, bodyHtml, onSave) {
+      closeRecordEditor();
+      const root = document.createElement('div');
+      root.id = 'recordEditorModal';
+      root.className = 'editor-modal';
+      root.innerHTML = `<section class="editor-panel" role="dialog" aria-modal="true" aria-label="${title}">
+        <header class="editor-head"><div><h2>${title}</h2><p>${subtitle}</p></div><button type="button" class="editor-close" aria-label="إغلاق" id="recordEditorClose">×</button></header>
+        <form id="recordEditorForm"><div class="editor-body">${bodyHtml}</div>
+          <footer class="editor-actions"><button type="submit" class="btn-success" id="recordEditorSave">حفظ التعديلات</button><button type="button" class="btn-secondary" id="recordEditorCancel">إلغاء</button><span class="editor-save-status" id="recordEditorStatus"></span></footer>
+        </form></section>`;
+      document.body.appendChild(root);
+      document.body.style.overflow = 'hidden';
+      root.querySelector('#recordEditorClose').addEventListener('click', closeRecordEditor);
+      root.querySelector('#recordEditorCancel').addEventListener('click', closeRecordEditor);
+      root.addEventListener('click', e => { if (e.target === root) closeRecordEditor(); });
+      root.querySelector('#recordEditorForm').addEventListener('submit', async e => {
+        e.preventDefault();
+        const saveBtn = root.querySelector('#recordEditorSave');
+        const status = root.querySelector('#recordEditorStatus');
+        if (saveBtn.disabled) return;
+        saveBtn.disabled = true; saveBtn.textContent = 'جارٍ الحفظ...'; status.textContent = 'يتم حفظ البيانات محلياً ومزامنتها...';
+        try {
+          await onSave(root);
+          status.textContent = 'تم الحفظ';
+          closeRecordEditor();
+        } catch (err) {
+          console.error('Record editor save error:', err);
+          status.textContent = 'تعذر الحفظ؛ يمكنك المحاولة مجدداً';
+          alert('تعذر حفظ التعديلات: ' + (err.message || err));
+          saveBtn.disabled = false; saveBtn.textContent = 'إعادة المحاولة';
+        }
+      });
+      const first = root.querySelector('input,textarea,select');
+      if (first) setTimeout(() => first.focus(), 40);
+      return root;
+    }
+
     function editCustomerDetails(customerId) {
       if (!isCurrentUserAdmin()) return alert('تعديل معلومات الزبون متاح للمدير فقط.');
       const customer = getCustomerById(customerId);
       if (!customer) return alert('لم يتم العثور على الزبون.');
-      const name = prompt('اسم الزبون:', customer.name || ''); if (name === null) return;
-      const storeName = prompt('اسم المحل / الماركت:', customer.storeName || ''); if (storeName === null) return;
-      const phone = prompt('رقم الهاتف:', customer.phone || ''); if (phone === null) return;
-      const address = prompt('العنوان التفصيلي:', customer.address || ''); if (address === null) return;
-      const gps = prompt('إحداثيات GPS (خط العرض، خط الطول):', customer.gps || ''); if (gps === null) return;
-      if (!name.trim() && !storeName.trim()) return alert('يجب إدخال اسم الزبون أو اسم المحل على الأقل.');
-      customer.name = name.trim(); customer.storeName = storeName.trim();
-      customer.phone = phone.trim(); customer.address = address.trim(); customer.gps = gps.trim();
-      customer.updatedAt = new Date().toISOString();
-      customer.updatedBy = state.currentUser.name || 'المدير';
-      saveData();
-      if (typeof renderAdminView === 'function') renderAdminView();
-      if (document.getElementById('adminCustomerLedgerSelect')) renderCustomerAccountsPanel('admin');
-      closeCustomerQuickProfile();
-      alert('تم تحديث معلومات الزبون وحفظها.');
+      const esc = value => String(value ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+      const body = `<div class="editor-grid">
+        <div class="editor-field"><label for="editCustomerName">اسم الزبون</label><input id="editCustomerName" value="${esc(customer.name)}" required></div>
+        <div class="editor-field"><label for="editCustomerStore">اسم المحل / الماركت</label><input id="editCustomerStore" value="${esc(customer.storeName)}"></div>
+        <div class="editor-field"><label for="editCustomerPhone">رقم الهاتف</label><input id="editCustomerPhone" type="tel" value="${esc(customer.phone)}"></div>
+        <div class="editor-field"><label for="editCustomerGps">إحداثيات GPS</label><input id="editCustomerGps" value="${esc(customer.gps)}" placeholder="33.3152, 44.3661"><div class="editor-hint">اكتب خط العرض ثم خط الطول، وافصل بينهما بفاصلة</div></div>
+        <div class="editor-field full"><label for="editCustomerAddress">العنوان التفصيلي</label><textarea id="editCustomerAddress">${esc(customer.address)}</textarea></div>
+      </div>`;
+      openRecordEditor('تعديل بيانات الزبون', `تحديث سجل: ${esc(customer.storeName || customer.name || 'زبون')}`, body, async root => {
+        const name = root.querySelector('#editCustomerName').value.trim();
+        const storeName = root.querySelector('#editCustomerStore').value.trim();
+        const gps = root.querySelector('#editCustomerGps').value.trim();
+        if (!name && !storeName) throw new Error('أدخل اسم الزبون أو اسم المحل على الأقل.');
+        if (gps) {
+          const coords = gps.split(',').map(v => Number(v.trim()));
+          if (coords.length !== 2 || !Number.isFinite(coords[0]) || !Number.isFinite(coords[1]) || Math.abs(coords[0]) > 90 || Math.abs(coords[1]) > 180) throw new Error('إحداثيات GPS غير صحيحة. مثال: 33.3152, 44.3661');
+        }
+        customer.name = name; customer.storeName = storeName;
+        customer.phone = root.querySelector('#editCustomerPhone').value.trim();
+        customer.address = root.querySelector('#editCustomerAddress').value.trim();
+        customer.gps = gps;
+        customer.updatedAt = new Date().toISOString();
+        customer.updatedBy = (state.currentUser && state.currentUser.name) || 'المدير';
+        await saveData();
+        if (typeof renderAdminView === 'function') renderAdminView();
+        if (document.getElementById('adminCustomerLedgerSelect')) renderCustomerAccountsPanel('admin');
+        if (typeof closeCustomerQuickProfile === 'function') closeCustomerQuickProfile();
+      });
     }
 
     function editProductDetails(productId) {
       if (!isCurrentUserAdmin()) return alert('تعديل المنتجات متاح للمدير فقط.');
       const product = (state.products || []).find(p => String(p.id) === String(productId));
       if (!product) return alert('لم يتم العثور على المنتج.');
-      const name = prompt('اسم المنتج:', product.name || ''); if (name === null) return;
-      const desc = prompt('الوصف / الحجم / عدد القطع:', product.desc || ''); if (desc === null) return;
-      const price = prompt('سعر الكارتون بالدينار:', String(product.price ?? 0)); if (price === null) return;
-      const commission = prompt('عمولة الكارتون:', String(product.commission ?? 0)); if (commission === null) return;
-      const minQtyDiscount = prompt('الحد الأدنى للخصم:', String(product.minQtyDiscount ?? 0)); if (minQtyDiscount === null) return;
-      const discountPerCarton = prompt('الخصم لكل كارتون:', String(product.discountPerCarton ?? 0)); if (discountPerCarton === null) return;
-      const flavorText = (product.flavors || []).map(f => `${f.name}|${f.stock}`).join('\n');
-      const flavorsInput = prompt('النكهات — كل سطر بالشكل: اسم النكهة|عدد الكراتين\nيمكنك إضافة أو حذف أو تعديل النكهات:', flavorText);
-      if (flavorsInput === null) return;
-      const num = v => Number(String(v).replace(/,/g,'').trim());
-      const vals = [price, commission, minQtyDiscount, discountPerCarton].map(num);
-      if (!name.trim() || vals.some(v => !Number.isFinite(v) || v < 0)) return alert('تحقق من اسم المنتج والأسعار والعمولات والخصومات.');
-      const flavors = [];
-      for (const line of flavorsInput.split(/\r?\n/).map(x=>x.trim()).filter(Boolean)) {
-        const parts = line.split('|'); const fname = (parts.shift() || '').trim(); const qty = num(parts.join('|'));
-        if (!fname || !Number.isFinite(qty) || qty < 0) return alert('صيغة النكهة غير صحيحة. استخدم: اسم النكهة|عدد الكراتين');
-        flavors.push({name:fname, stock:qty});
-      }
-      product.name=name.trim(); product.desc=desc.trim(); product.price=vals[0];
-      product.commission=vals[1]; product.minQtyDiscount=vals[2]; product.discountPerCarton=vals[3];
-      product.flavors=flavors;
-      product.totalStock=flavors.length ? flavors.reduce((sum,f)=>sum+Number(f.stock||0),0) : Number(product.totalStock||0);
-      product.updatedAt=new Date().toISOString(); product.updatedBy=state.currentUser.name || 'المدير';
-      saveData(); renderAdminView();
-      pushNotification('delegate','تحديث بيانات منتج',`قام المدير بتحديث بيانات المنتج: ${product.name}`);
-      alert('تم تحديث بيانات المنتج والنكهات والمخزون وحفظها.');
+      const esc = value => String(value ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+      const flavors = Array.isArray(product.flavors) ? product.flavors : [];
+      const rows = flavors.map((f,i) => `<div class="flavor-editor-row"><input class="edit-flavor-name" aria-label="اسم النكهة" placeholder="اسم النكهة" value="${esc(f.name)}"><input class="edit-flavor-stock" aria-label="عدد الكراتين" type="number" min="0" step="1" placeholder="عدد الكراتين" value="${Number(f.stock)||0}"><button type="button" class="btn-danger remove-edit-flavor" title="حذف النكهة">×</button></div>`).join('');
+      const body = `<div class="editor-grid">
+        <div class="editor-field"><label for="editProductName">اسم المنتج</label><input id="editProductName" value="${esc(product.name)}" required></div>
+        <div class="editor-field"><label for="editProductPrice">سعر الكارتون (د.ع)</label><input id="editProductPrice" type="number" min="0" step="any" value="${Number(product.price)||0}" required></div>
+        <div class="editor-field full"><label for="editProductDesc">الوصف / الحجم / عدد القطع</label><textarea id="editProductDesc">${esc(product.desc)}</textarea></div>
+        <div class="editor-field"><label for="editProductCommission">عمولة الكارتون</label><input id="editProductCommission" type="number" min="0" step="any" value="${Number(product.commission)||0}"></div>
+        <div class="editor-field"><label for="editProductMinDiscount">الحد الأدنى للخصم</label><input id="editProductMinDiscount" type="number" min="0" step="any" value="${Number(product.minQtyDiscount)||0}"></div>
+        <div class="editor-field"><label for="editProductDiscount">الخصم لكل كارتون</label><input id="editProductDiscount" type="number" min="0" step="any" value="${Number(product.discountPerCarton)||0}"></div>
+        <div class="editor-field"><label>المخزون الكلي الحالي</label><input value="${Number(product.totalStock)||0} كارتون" disabled></div>
+      </div>
+      <div class="editor-section"><h3>إدارة النكهات والمخزون</h3><div id="editProductFlavors">${rows}</div><button type="button" class="btn-primary" id="addEditFlavor">＋ إضافة نكهة</button><div class="editor-hint">يمكنك تعديل اسم كل نكهة وكمية الكراتين أو إضافة نكهة جديدة أو حذفها. سيُحسب المخزون الكلي تلقائياً من مجموع النكهات.</div></div>`;
+      const root = openRecordEditor('تعديل المنتج بالكامل', `تحديث بيانات المنتج: ${esc(product.name)}`, body, async modal => {
+        const name = modal.querySelector('#editProductName').value.trim();
+        const numericIds = ['editProductPrice','editProductCommission','editProductMinDiscount','editProductDiscount'];
+        const nums = numericIds.map(id => Number(modal.querySelector('#'+id).value));
+        if (!name || nums.some(v => !Number.isFinite(v) || v < 0)) throw new Error('تحقق من اسم المنتج والأسعار والعمولات والخصومات؛ يجب أن تكون أرقاماً غير سالبة.');
+        const newFlavors = [];
+        for (const row of modal.querySelectorAll('.flavor-editor-row')) {
+          const flavorName = row.querySelector('.edit-flavor-name').value.trim();
+          const stockRaw = row.querySelector('.edit-flavor-stock').value;
+          const stock = Number(stockRaw);
+          if (!flavorName && stockRaw === '') continue;
+          if (!flavorName || !Number.isFinite(stock) || stock < 0) throw new Error('أكمل اسم وكمية كل نكهة، ويجب أن تكون الكمية صفراً أو أكثر.');
+          newFlavors.push({name:flavorName, stock});
+        }
+        product.name = name; product.desc = modal.querySelector('#editProductDesc').value.trim();
+        product.price = nums[0]; product.commission = nums[1]; product.minQtyDiscount = nums[2]; product.discountPerCarton = nums[3];
+        const hadFlavorStockTracking = Array.isArray(product.flavors) && product.flavors.length > 0;
+        product.flavors = newFlavors;
+        if (hadFlavorStockTracking || newFlavors.length) product.totalStock = newFlavors.reduce((sum,f)=>sum+f.stock,0);
+        product.updatedAt = new Date().toISOString(); product.updatedBy = (state.currentUser && state.currentUser.name) || 'المدير';
+        await saveData();
+        renderAdminView();
+        if (typeof pushNotification === 'function') pushNotification('delegate','تحديث بيانات منتج',`قام المدير بتحديث بيانات المنتج: ${product.name}`);
+      });
+      root.querySelector('#addEditFlavor').addEventListener('click', () => {
+        const row = document.createElement('div'); row.className = 'flavor-editor-row';
+        row.innerHTML = '<input class="edit-flavor-name" aria-label="اسم النكهة" placeholder="اسم النكهة"><input class="edit-flavor-stock" aria-label="عدد الكراتين" type="number" min="0" step="1" placeholder="عدد الكراتين" value="0"><button type="button" class="btn-danger remove-edit-flavor" title="حذف النكهة">×</button>';
+        root.querySelector('#editProductFlavors').appendChild(row); row.querySelector('.edit-flavor-name').focus();
+      });
+      root.querySelector('#editProductFlavors').addEventListener('click', e => {
+        const btn = e.target.closest('.remove-edit-flavor'); if (btn) btn.closest('.flavor-editor-row').remove();
+      });
     }
 
     function deleteProduct(productId) {
@@ -5403,7 +5499,7 @@ html,body,#app,.app-shell,.main-content,.view-section,.card,
               <small>${customerLedgerEscape(customer.phone || 'لا يوجد هاتف')}</small>
               <button type="button" class="customer-quick-map-inline" onclick="openCustomerMap('${String(customer.id).replace(/'/g, '')}')" aria-label="${customer.gps ? 'فتح موقع الزبون في خرائط Google' : 'طلب إذن الموقع وتحديد موقع الزبون'}">${gpsLabel} <span aria-hidden="true">↗</span></button>
             </div>
-            ${state.currentUser && state.currentUser.role === 'admin' ? `<button type="button" class="customer-quick-edit" onclick="editCustomerDetails(${JSON.stringify(String(customer.id))})">✎</button>` : '<div class="customer-quick-edit">✎</div>'}
+            ${state.currentUser && state.currentUser.role === 'admin' ? `<button type="button" class="customer-quick-edit" data-customer-id="${String(customer.id).replace(/&/g, '&amp;').replace(/"/g, '&quot;')}" onclick="editCustomerDetails(this.dataset.customerId)">✎</button>` : '<div class="customer-quick-edit">✎</div>'}
           </div>
           <div class="customer-quick-actions">
             <button type="button" onclick="alert('الرصيد الحالي: ${Math.abs(data.balance).toLocaleString('en-US')} د.ع — ${balanceLabel}')">▣　إظهار الرصيد</button>
