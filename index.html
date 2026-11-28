@@ -1645,6 +1645,9 @@
 let auth = null;
 let firestoreReady = false;
 let firestoreSaveQueue = Promise.resolve();
+// آخر نسخة مؤكدة من كل سجل في Firestore؛ نستخدمها لكتابة التغييرات فقط
+// حتى لا يستبدل جهاز قديم بيانات سجلات لم تتغير لديه.
+let firestoreSyncedCollections = Object.create(null);
 let manualLoginInProgress = false;
 let authRestoreInProgress = false;
 
@@ -2287,6 +2290,7 @@ try {
         returns: state.returns,
         receipts: state.receipts,
         customerAccountAdjustments: state.customerAccountAdjustments || [],
+        commissionAdjustments: state.commissionAdjustments || [],
         cartonCounterResets: state.cartonCounterResets || [],
         staffSettlements: state.staffSettlements || [],
         emptyVisits: state.emptyVisits,
@@ -2317,29 +2321,44 @@ try {
       return JSON.parse(JSON.stringify(value));
     }
 
+    function firestoreItemDocumentId(item, index) {
+      const rawId = item && item.id !== undefined && item.id !== null
+        ? String(item.id)
+        : (item && item.username ? String(item.username) : `row_${index}`);
+      return rawId.replace(/\//g, '_') || `row_${index}`;
+    }
+
+    function firestoreComparableItem(collectionName, item, index) {
+      const payload = firestoreSafeObject(item || {});
+      if (collectionName === 'users') delete payload.password;
+      payload.__appOrder = index;
+      return payload;
+    }
+
     async function writeFirestoreCollection(collectionName, items) {
       const collectionRef = getFirestoreRootRef().collection(collectionName);
-      const currentSnapshot = await collectionRef.get();
-      const desiredIds = new Set();
+      const previous = firestoreSyncedCollections[collectionName] || Object.create(null);
+      const next = Object.create(null);
       const operations = [];
 
       (items || []).forEach((item, index) => {
-        const rawId = item && item.id !== undefined && item.id !== null
-          ? String(item.id)
-          : (item && item.username ? String(item.username) : `row_${index}`);
-        const docId = rawId.replace(/\//g, '_') || `row_${index}`;
-        desiredIds.add(docId);
-        const payload = firestoreSafeObject(item || {});
-        if (collectionName === 'users') delete payload.password;
-        payload.__appOrder = index;
-        operations.push({ type: 'set', ref: collectionRef.doc(docId), data: payload });
+        const docId = firestoreItemDocumentId(item, index);
+        const payload = firestoreComparableItem(collectionName, item, index);
+        next[docId] = payload;
+        // لا نكتب إلا السجل الذي تغير فعلاً منذ آخر نسخة مؤكدة/مستلمة.
+        if (!previous[docId] || JSON.stringify(previous[docId]) !== JSON.stringify(payload)) {
+          operations.push({ type: 'set', ref: collectionRef.doc(docId), data: payload });
+        }
       });
 
-      currentSnapshot.docs.forEach(doc => {
-        if (!desiredIds.has(doc.id)) operations.push({ type: 'delete', ref: doc.ref });
+      // الحذف الصريح يقتصر على سجل كان معروفاً في النسخة المتزامنة ثم أزيل محلياً.
+      // لا نجلب المجموعة ونحذف مستندات مجهولة قد تكون أضيفت من جهاز آخر.
+      Object.keys(previous).forEach(docId => {
+        if (!Object.prototype.hasOwnProperty.call(next, docId)) {
+          operations.push({ type: 'delete', ref: collectionRef.doc(docId) });
+        }
       });
 
-      // Firestore batches allow at most 500 writes. Use smaller batches for safety.
       for (let i = 0; i < operations.length; i += 400) {
         const batch = db.batch();
         operations.slice(i, i + 400).forEach(op => {
@@ -2348,7 +2367,21 @@ try {
         });
         await batch.commit();
       }
+      // لا نحدّث خط الأساس إلا بعد نجاح جميع الدفعات.
+      firestoreSyncedCollections[collectionName] = next;
     }
+
+    function rememberFirestoreCollectionSnapshot(collectionName, snapshot) {
+      const baseline = Object.create(null);
+      snapshot.docs.forEach((doc, index) => {
+        const item = doc.data() || {};
+        const order = Number.isFinite(Number(item.__appOrder)) ? Number(item.__appOrder) : index;
+        delete item.__appOrder;
+        baseline[doc.id] = firestoreComparableItem(collectionName, item, order);
+      });
+      firestoreSyncedCollections[collectionName] = baseline;
+    }
+
 
     async function persistStateToFirestore() {
       if (!db) throw new Error('Firebase Firestore is not initialized');
@@ -2531,6 +2564,7 @@ try {
         rootRef.collection(collectionName).onSnapshot(snapshot => {
           const oldOrdersCount = (state.orders || []).length;
           const oldReceiptsCount = (state.receipts || []).length;
+          rememberFirestoreCollectionSnapshot(collectionName, snapshot);
           state[collectionName] = normalizeFirestoreItems(snapshot);
 
           if (collectionName === 'users') {
@@ -2604,6 +2638,7 @@ try {
           const cloudData = {};
           if (rootSnapshot.exists && rootSnapshot.data().company) cloudData.company = rootSnapshot.data().company;
           FIRESTORE_ARRAYS.forEach((name, index) => {
+            rememberFirestoreCollectionSnapshot(name, collectionSnapshots[index]);
             cloudData[name] = normalizeFirestoreItems(collectionSnapshots[index]);
           });
           mergeCloudState(cloudData);
@@ -2658,16 +2693,25 @@ try {
 
     function saveData() {
       saveLocalBackup();
-      if (db && auth && auth.currentUser && firestoreReady) {
-        firestoreSaveQueue = firestoreSaveQueue
-          .then(() => persistStateToFirestore())
-          .catch(err => {
-            console.error('Failed to save data to Cloud Firestore:', err);
-            updateCloudSyncBadge('🟡 فشل الحفظ في Firestore - تحقق من قواعد الأمان والاتصال', '#facc15');
-          });
+      if (!db || !auth || !auth.currentUser || !firestoreReady) {
+        updateCloudSyncBadge('🟡 البيانات محفوظة على هذا الجهاز فقط - المزامنة السحابية غير جاهزة', '#facc15');
+        return Promise.resolve(false);
       }
+
+      firestoreSaveQueue = firestoreSaveQueue
+        .then(() => persistStateToFirestore())
+        .then(() => {
+          updateCloudSyncBadge('🟢 تم حفظ التغييرات ومزامنتها مع Firestore', '#4ade80');
+          return true;
+        })
+        .catch(err => {
+          console.error('Failed to save data to Cloud Firestore:', err);
+          updateCloudSyncBadge('🔴 فشل حفظ البيانات سحابياً - بقيت نسخة محلية فقط', '#f87171');
+          return false;
+        });
       return firestoreSaveQueue;
     }
+
 
     function applySystemBranding() {
       const name = state.company.name || "نظام إدارة المبيعات";
